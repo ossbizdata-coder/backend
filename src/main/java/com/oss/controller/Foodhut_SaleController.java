@@ -1,5 +1,4 @@
 package com.oss.controller;
-
 import com.oss.dto.Foodhut_DaySummaryResponse;
 import com.oss.dto.Foodhut_RemainingItemDto;
 import com.oss.dto.Foodhut_TransactionRequest;
@@ -15,27 +14,20 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-
 @RestController
 @RequestMapping("/api/sales")
 @RequiredArgsConstructor
 public class Foodhut_SaleController {
-
     private final Foodhut_TransactionService saleService;
     private final UserRepository userRepository;
-
     @PostMapping
     public ResponseEntity<Void> addSale(@RequestBody Foodhut_TransactionRequest req) {
-
         Authentication authentication = SecurityContextHolder
                 .getContext()
                 .getAuthentication();
-
         String email = authentication.getName();
-
         User user = userRepository.findByEmail(email)
                                   .orElseThrow(() -> new RuntimeException("User not found"));
-
         saleService.addSale(
                 req.getVariationId(),
                 req.getPreparedQty(),
@@ -43,10 +35,8 @@ public class Foodhut_SaleController {
                 req.getActionType(),
                 user
                            );
-
         return ResponseEntity.ok().build();
     }
-
     @GetMapping("/day")
     public List<Foodhut_TransactionResponse> getSalesForDay(
             @RequestParam(required = false)
@@ -55,7 +45,6 @@ public class Foodhut_SaleController {
                                                            ) {
         return saleService.getSalesForDay(date);
     }
-
     @GetMapping("/day/summary")
     public Foodhut_DaySummaryResponse getSummaryForDay(
             @RequestParam(required = false)
@@ -64,7 +53,6 @@ public class Foodhut_SaleController {
                                                       ) {
         return saleService.getSummaryForDay(date);
     }
-
     @GetMapping("/remaining/list")
     public List<Foodhut_RemainingItemDto> getRemainingForDay(
             @RequestParam(required = false)

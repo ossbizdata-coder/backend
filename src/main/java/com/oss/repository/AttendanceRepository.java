@@ -1,43 +1,33 @@
 package com.oss.repository;
-
 import com.oss.model.*;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
-
     // ======================
     // BASIC QUERIES
     // ======================
-
     Optional<Attendance> findByUserAndWorkDate(
             User user,
             Instant workDate
                                               );
-
     List<Attendance> findByUserOrderByWorkDateDesc(User user);
-
     List<Attendance> findByUserAndWorkDateBetween(
             User user,
             Instant start,
             Instant end
                                                  );
-
     List<Attendance> findByUserAndWorkDateBetweenOrderByWorkDateDesc(
             User user,
             Instant start,
             Instant end
                                                                     );
-
     // ======================
     // MY ATTENDANCE HISTORY
     // ======================
-
     @Query("""
         SELECT new com.oss.model.AttendanceHistory(
             a.workDate,
@@ -54,11 +44,9 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
     List<AttendanceHistory> getMyHistory(
             @Param("user") User user
                                         );
-
     // ======================
     // STAFF ATTENDANCE REPORT
     // ======================
-
     @Query("""
         SELECT new com.oss.model.StaffAttendanceReport(
             u.id,
@@ -73,13 +61,11 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
         GROUP BY u.id, u.name, u.email
     """)
     List<StaffAttendanceReport> getAttendanceReportGroupedByUser();
-
     // ======================
     // STAFF SALARY REPORT (SAFE VERSION)
     // ======================
-    // ❌ REMOVED TIMESTAMPDIFF (DB specific)
-    // ✔ Uses pre-calculated totalMinutes
-
+    // âŒ REMOVED TIMESTAMPDIFF (DB specific)
+    // âœ” Uses pre-calculated totalMinutes
     @Query("""
         SELECT new com.oss.model.StaffSalaryReport(
             u.id,

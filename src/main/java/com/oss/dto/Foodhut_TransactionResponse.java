@@ -1,10 +1,7 @@
 package com.oss.dto;
-
 import com.oss.model.SaleActionType;
 import java.time.LocalDateTime;
-
 public class Foodhut_TransactionResponse {
-
     private Long saleId;
     private String itemName;
     private String variation;
@@ -16,7 +13,6 @@ public class Foodhut_TransactionResponse {
     private SaleActionType actionType;
     private LocalDateTime transactionTime;
     private String recordedBy;
-
     public Foodhut_TransactionResponse(
             Long saleId,
             String itemName,
@@ -42,9 +38,7 @@ public class Foodhut_TransactionResponse {
         this.transactionTime = transactionTime;
         this.recordedBy = recordedBy;
     }
-
     public Foodhut_TransactionResponse() {}
-
     public Long getSaleId() { return saleId; }
     public String getItemName() { return itemName; }
     public String getVariation() { return variation; }
@@ -56,7 +50,6 @@ public class Foodhut_TransactionResponse {
     public SaleActionType getActionType() { return actionType; }
     public LocalDateTime getTransactionTime() { return transactionTime; }
     public String getRecordedBy() { return recordedBy; }
-
     public void setSaleId(Long saleId) { this.saleId = saleId; }
     public void setItemName(String itemName) { this.itemName = itemName; }
     public void setVariation(String variation) { this.variation = variation; }

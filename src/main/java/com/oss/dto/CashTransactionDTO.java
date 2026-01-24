@@ -1,13 +1,10 @@
 package com.oss.dto;
-
 import com.oss.model.CashTransaction;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
 import java.time.LocalDateTime;
-
 @Data
 @Builder
 @NoArgsConstructor
@@ -23,7 +20,6 @@ public class CashTransactionDTO {
     private Long recordedById;
     private String recordedByName;
     private LocalDateTime createdAt;
-
     public static CashTransactionDTO from(CashTransaction ct) {
         return CashTransactionDTO.builder()
                 .id(ct.getId())
@@ -39,4 +35,3 @@ public class CashTransactionDTO {
                 .build();
     }
 }
-

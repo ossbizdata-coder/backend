@@ -1,25 +1,19 @@
 package com.oss.security;
-
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
-
 import java.security.Key;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-
 @Component
 public class JwtUtil {
-
     private final String SECRET = "your256bitlongsecretkeyyour256bitlongsecretkey"; // load from env in prod
-
     private Key getSigningKey() {
         return Keys.hmacShaKeyFor(SECRET.getBytes());
     }
-
     // New: include role in token
     public String generateToken(UserDetails userDetails, String role, Long id) {
         Map<String, Object> claims = new HashMap<>();
@@ -27,7 +21,6 @@ public class JwtUtil {
         claims.put("id", id);
         return createToken(claims, userDetails.getUsername());
     }
-
     private String createToken(Map<String, Object> claims, String subject) {
         long expirationTime = 3 * 24 * 60 * 60 * 1000; // 3 days in milliseconds
         return Jwts.builder()
@@ -38,7 +31,6 @@ public class JwtUtil {
                    .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                    .compact();
     }
-
     public String extractUsername(String token) {
         return Jwts.parserBuilder()
                    .setSigningKey(getSigningKey())
@@ -47,7 +39,6 @@ public class JwtUtil {
                    .getBody()
                    .getSubject();
     }
-
     public String extractRole(String token) {
         return Jwts.parserBuilder()
                    .setSigningKey(getSigningKey())
@@ -56,11 +47,9 @@ public class JwtUtil {
                    .getBody()
                    .get("role", String.class);
     }
-
     public boolean isTokenValid(String token, String username) {
         return extractUsername(token).equals(username) && !isTokenExpired(token);
     }
-
     public boolean isTokenExpired(String token) {
         return Jwts.parserBuilder()
                    .setSigningKey(getSigningKey())

@@ -1,27 +1,21 @@
 package com.oss.service;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oss.model.AuditLog;
 import com.oss.model.User;
 import com.oss.repository.AuditLogRepository;
 import org.springframework.stereotype.Service;
-
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
-
 @Service
 public class AuditLogService {
-
     private final AuditLogRepository auditLogRepo;
     private final ObjectMapper objectMapper;
-
     public AuditLogService(AuditLogRepository auditLogRepo) {
         this.auditLogRepo = auditLogRepo;
         this.objectMapper = new ObjectMapper();
     }
-
     /**
      * Create an audit log entry
      */
@@ -30,7 +24,6 @@ public class AuditLogService {
         try {
             String oldValueJson = oldValues != null ? objectMapper.writeValueAsString(oldValues) : null;
             String newValueJson = newValues != null ? objectMapper.writeValueAsString(newValues) : null;
-
             AuditLog auditLog = AuditLog.builder()
                     .user(user)
                     .action(action)
@@ -40,42 +33,28 @@ public class AuditLogService {
                     .newValue(newValueJson)
                     .createdAt(Instant.now())
                     .build();
-
             auditLogRepo.save(auditLog);
         } catch (JsonProcessingException e) {
             System.err.println("Failed to create audit log: " + e.getMessage());
             // Don't fail the transaction if audit logging fails
         }
     }
-
-    /**
-     * Get all audit logs
-     */
     public List<Map<String, Object>> getAllAuditLogs() {
         return auditLogRepo.findAll().stream()
                 .sorted(Comparator.comparing(AuditLog::getCreatedAt).reversed())
                 .map(this::convertToMap)
                 .collect(Collectors.toList());
     }
-
-    /**
-     * Get audit logs for a specific entity
-     */
     public List<Map<String, Object>> getAuditLogsByEntity(String entityType, Long entityId) {
         return auditLogRepo.findByEntityTypeAndEntityId(entityType, entityId).stream()
                 .map(this::convertToMap)
                 .collect(Collectors.toList());
     }
-
-    /**
-     * Get audit logs by user
-     */
     public List<Map<String, Object>> getAuditLogsByUser(Long userId) {
         return auditLogRepo.findByUserId(userId).stream()
                 .map(this::convertToMap)
                 .collect(Collectors.toList());
     }
-
     /**
      * Filter audit logs
      */
@@ -87,7 +66,6 @@ public class AuditLogService {
                 .map(this::convertToMap)
                 .collect(Collectors.toList());
     }
-
     /**
      * Convert AuditLog to Map for response
      */
@@ -105,7 +83,6 @@ public class AuditLogService {
         map.put("createdAt", log.getCreatedAt().toString());
         return map;
     }
-
     /**
      * Parse JSON string to Map
      */
@@ -120,4 +97,3 @@ public class AuditLogService {
         }
     }
 }
-

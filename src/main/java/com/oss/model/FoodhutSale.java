@@ -1,40 +1,28 @@
 package com.oss.model;
-
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
-
-
 @Entity
 @Table(name = "foodhut_sales")
 public class FoodhutSale {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "item_variation_id", nullable = false)
     private FoodhutItemVariation itemVariation;
-
     @Column(name = "prepared_qty", nullable = false)
     private int preparedQty;
-
     @Column(name = "remaining_qty", nullable = false)
     private int remainingQty;
-
     @Column(name = "transaction_time", nullable = false)
     private LocalDateTime transactionTime;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "recorded_by", nullable = false)
     private User recordedBy;
-
     @Column(name = "action_type", nullable = false, length = 20)
     private String actionType = "PREPARED";
-
     // No-args constructor (needed by JPA)
     public FoodhutSale() {}
-
     // All-args constructor
     public FoodhutSale(FoodhutItemVariation itemVariation, int preparedQty, int remainingQty, LocalDateTime transactionTime, User recordedBy, String actionType) {
         this.itemVariation = itemVariation;
@@ -44,7 +32,6 @@ public class FoodhutSale {
         this.recordedBy = recordedBy;
         this.actionType = actionType;
     }
-
     // Getters and setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

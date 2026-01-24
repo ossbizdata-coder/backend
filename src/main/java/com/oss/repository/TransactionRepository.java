@@ -1,14 +1,11 @@
 package com.oss.repository;
-
 import com.oss.model.Transaction;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
-
     @Query("""
         SELECT COALESCE(SUM(t.amount), 0)
         FROM Transaction t
@@ -23,7 +20,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             Instant startTime,
             Instant endTime
                                 );
-
     @Query("""
         SELECT t FROM Transaction t
         LEFT JOIN FETCH t.expenseType
@@ -34,7 +30,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("start") Instant start,
             @Param("end") Instant end
     );
-
     // Filter by department and/or category using time range
     @Query("""
         SELECT t FROM Transaction t
@@ -51,7 +46,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("startTime") Instant startTime,
             @Param("endTime") Instant endTime
     );
-
     // Sum expenses by department and date
     @Query("""
         SELECT COALESCE(SUM(t.amount), 0)
@@ -64,7 +58,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("department") String department,
             @Param("dateMillis") Long dateMillis
     );
-
     // Sum sales by department and date range
     @Query("""
         SELECT COALESCE(SUM(t.amount), 0)
@@ -79,7 +72,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("startDateMillis") Long startDateMillis,
             @Param("endDateMillis") Long endDateMillis
     );
-
     // Sum expenses by department and date range
     @Query("""
         SELECT COALESCE(SUM(t.amount), 0)
@@ -94,7 +86,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("startDateMillis") Long startDateMillis,
             @Param("endDateMillis") Long endDateMillis
     );
-
     // Get transactions by department and category
     @Query("""
         SELECT t FROM Transaction t
@@ -106,7 +97,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("department") String department,
             @Param("category") String category
     );
-
     // Get all transactions by category
     @Query("""
         SELECT t FROM Transaction t
@@ -115,7 +105,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
         ORDER BY t.transactionTime DESC
     """)
     List<Transaction> findByCategoryOrderByTransactionTimeDesc(@Param("category") String category);
-
     // Get all transactions by department and date (using business_date timestamp)
     @Query(value = """
         SELECT t.* FROM shop_transactions t
@@ -127,7 +116,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("department") String department,
             @Param("dateMillis") Long dateMillis
     );
-
     // Get all transactions by business date (no filters, using timestamp)
     @Query(value = """
         SELECT t.* FROM shop_transactions t
@@ -135,7 +123,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
         ORDER BY t.transaction_time ASC
     """, nativeQuery = true)
     List<Transaction> findByBusinessDateNative(@Param("dateMillis") Long dateMillis);
-
     // Keep JPA versions for backward compatibility
     @Query("""
         SELECT t FROM Transaction t
@@ -148,7 +135,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("department") String department,
             @Param("dateMillis") Long dateMillis
     );
-
     // Get all transactions by business date (no filters)
     @Query("""
         SELECT t FROM Transaction t
@@ -157,7 +143,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
         ORDER BY t.transactionTime ASC
     """)
     List<Transaction> findByBusinessDate(@Param("dateMillis") Long dateMillis);
-
     // Get all transactions within a date range
     @Query("""
         SELECT t FROM Transaction t
@@ -170,7 +155,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("startDateMillis") Long startDateMillis,
             @Param("endDateMillis") Long endDateMillis
     );
-
     // Get the latest closing balance for a department
     @Query("""
         SELECT t FROM Transaction t
@@ -182,7 +166,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
         LIMIT 1
     """)
     Transaction findLatestClosingBalanceByDepartment(@Param("department") String department);
-
     // Get transactions by department, category and date
     @Query("""
         SELECT t FROM Transaction t

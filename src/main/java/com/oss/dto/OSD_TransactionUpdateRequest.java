@@ -1,7 +1,5 @@
 package com.oss.dto;
-
 import lombok.Data;
-
 @Data
 public class OSD_TransactionUpdateRequest {
     private Double amount;
@@ -9,4 +7,3 @@ public class OSD_TransactionUpdateRequest {
     private String comment;
     private Long expenseTypeId;
 }
-

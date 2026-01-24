@@ -1,24 +1,18 @@
 package com.oss.controller;
-
 import com.oss.model.AuditLog;
 import com.oss.service.AuditLogService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 import java.util.Map;
-
 @RestController
 @RequestMapping("/api/audit-logs")
 public class AuditLogController {
-
     private final AuditLogService auditLogService;
-
     public AuditLogController(AuditLogService auditLogService) {
         this.auditLogService = auditLogService;
     }
-
     /**
      * GET /api/audit-logs
      * Get all audit logs (SUPERADMIN only)
@@ -28,7 +22,6 @@ public class AuditLogController {
     public ResponseEntity<List<Map<String, Object>>> getAllAuditLogs() {
         return ResponseEntity.ok(auditLogService.getAllAuditLogs());
     }
-
     /**
      * GET /api/audit-logs/entity/{entityType}/{entityId}
      * Get audit logs for a specific entity (e.g., DAILY_CASH/123)
@@ -40,7 +33,6 @@ public class AuditLogController {
             @PathVariable Long entityId) {
         return ResponseEntity.ok(auditLogService.getAuditLogsByEntity(entityType, entityId));
     }
-
     /**
      * GET /api/audit-logs/user/{userId}
      * Get audit logs for a specific user's actions
@@ -50,7 +42,6 @@ public class AuditLogController {
     public ResponseEntity<List<Map<String, Object>>> getAuditLogsByUser(@PathVariable Long userId) {
         return ResponseEntity.ok(auditLogService.getAuditLogsByUser(userId));
     }
-
     /**
      * GET /api/audit-logs/filter
      * Filter audit logs by entity type or action
@@ -63,4 +54,3 @@ public class AuditLogController {
         return ResponseEntity.ok(auditLogService.filterAuditLogs(entityType, action));
     }
 }
-

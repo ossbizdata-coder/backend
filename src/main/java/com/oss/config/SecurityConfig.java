@@ -1,5 +1,4 @@
 package com.oss.config;
-
 import com.oss.security.JwtAuthFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -16,13 +15,10 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import jakarta.servlet.http.HttpServletResponse;
-
 @Configuration
 public class SecurityConfig {
-
     @Autowired
     private JwtAuthFilter jwtAuthFilter;
-
     @Bean
     public AccessDeniedHandler accessDeniedHandler() {
         return (request, response, accessDeniedException) -> {
@@ -30,7 +26,6 @@ public class SecurityConfig {
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access Denied");
         };
     }
-
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
@@ -44,24 +39,19 @@ public class SecurityConfig {
                     .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/items", "/api/items/**", "/items", "/items/**").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/items", "/api/items/**", "/items", "/items/**").permitAll()
-
                     // All other /api/** endpoints - accessible by STAFF, ADMIN, SUPERADMIN
                     .requestMatchers("/api/**").hasAnyRole("STAFF", "ADMIN", "SUPERADMIN")
-
                     // Default - require authentication
                     .anyRequest().authenticated()
                 )
                 .exceptionHandling(eh -> eh.accessDeniedHandler(accessDeniedHandler()))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-
         return http.build();
     }
-
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
-
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
