@@ -43,13 +43,20 @@ public class Admin_TransactionController {
             User user = userRepository.findByEmail(principal.getName())
                     .orElseThrow(() -> new RuntimeException("User not found"));
             transactionService.updateTransaction(id, updates, user);
+
+            // Return updated transaction details
+            Map<String, Object> updatedTransaction = transactionService.getTransactionDetails(id);
+
             return ResponseEntity.ok(Map.of(
                 "message", "Transaction updated successfully",
-                "note", "Daily summary has been recalculated"
+                "note", "Daily summary has been recalculated",
+                "transaction", updatedTransaction
             ));
         } catch (RuntimeException e) {
+            e.printStackTrace(); // Log the full stack trace
             return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
+            e.printStackTrace(); // Log the full stack trace
             return ResponseEntity.status(500).body(Map.of("error", "Internal server error: " + e.getMessage()));
         }
     }

@@ -22,7 +22,9 @@ public class JwtUtil {
         return createToken(claims, userDetails.getUsername());
     }
     private String createToken(Map<String, Object> claims, String subject) {
-        long expirationTime = 3 * 24 * 60 * 60 * 1000; // 3 days in milliseconds
+        // Set to 10 years (effectively unlimited until server restart)
+        // Since PIN verification is used, token doesn't need to expire
+        long expirationTime = 10L * 365 * 24 * 60 * 60 * 1000; // 10 years in milliseconds
         return Jwts.builder()
                    .setClaims(claims)
                    .setSubject(subject)

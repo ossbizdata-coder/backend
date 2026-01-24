@@ -19,20 +19,13 @@ public class LocalDateAttributeConverter implements AttributeConverter<LocalDate
     @Override
     public LocalDate convertToEntityAttribute(Long epochMillis) {
         // Convert epoch milliseconds to LocalDate
-        // Handle both epoch days (small numbers) and epoch milliseconds (large numbers)
         if (epochMillis == null) {
             return null;
         }
 
-        // If the value is small (< 100000), treat it as epoch days for backward compatibility
-        // Otherwise treat as epoch milliseconds
-        if (epochMillis < 100000) {
-            return LocalDate.ofEpochDay(epochMillis);
-        } else {
-            return Instant.ofEpochMilli(epochMillis)
-                .atZone(ZoneId.systemDefault())
-                .toLocalDate();
-        }
+        return Instant.ofEpochMilli(epochMillis)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate();
     }
 }
 

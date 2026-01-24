@@ -120,8 +120,17 @@ public class DailyCashService {
         Double totalSales = null;
         Double variance = null;
         if (dailyCash.getClosingCash() != null) {
-            totalSales = dailyCash.getClosingCash() - dailyCash.getOpeningCash() + totalExpenses - manualSales;
-            variance = totalSales - totalCredits;
+            // Total Sales = all sales including both cash and credit
+            // Formula: totalSales = (closingCash - openingCash) + totalExpenses + totalCredits - manualSales
+            totalSales = (dailyCash.getClosingCash() - dailyCash.getOpeningCash()) + totalExpenses + totalCredits - manualSales;
+
+            // Expected closing = opening + totalSales - totalExpenses - totalCredits + manualSales
+            Double expectedClosing = dailyCash.getOpeningCash() + totalSales - totalExpenses - totalCredits + manualSales;
+
+            // Variance = difference between expected and actual closing cash
+            // Positive variance = more cash than expected (surplus)
+            // Negative variance = less cash than expected (shortfall)
+            variance = dailyCash.getClosingCash() - expectedClosing;
         }
         return DailyCashSummaryDTO.builder()
                 .dailyCashId(dailyCash.getId())

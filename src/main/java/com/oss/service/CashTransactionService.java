@@ -59,9 +59,15 @@ public class CashTransactionService {
      */
     @Transactional
     public void updateTransaction(Long id, Map<String, Object> updates, User user) {
+        log.info("Updating transaction {}: {}", id, updates);
+
         CashTransaction transaction = transactionRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Transaction not found"));
         DailyCash dailyCash = transaction.getDailyCash();
+
+        log.info("Found transaction: ID={}, Amount={}, DailyCashID={}, Locked={}",
+                 id, transaction.getAmount(), dailyCash.getId(), dailyCash.getLocked());
+
         // Capture old values for audit
         Map<String, Object> oldValues = new HashMap<>();
         oldValues.put("amount", transaction.getAmount());
@@ -69,7 +75,9 @@ public class CashTransactionService {
         oldValues.put("expenseTypeId", transaction.getExpenseType() != null ? transaction.getExpenseType().getId() : null);
         // Update fields
         if (updates.containsKey("amount")) {
-            transaction.setAmount(((Number) updates.get("amount")).doubleValue());
+            Double newAmount = ((Number) updates.get("amount")).doubleValue();
+            log.info("Updating amount from {} to {}", transaction.getAmount(), newAmount);
+            transaction.setAmount(newAmount);
         }
         if (updates.containsKey("description")) {
             transaction.setDescription((String) updates.get("description"));
@@ -81,20 +89,28 @@ public class CashTransactionService {
             transaction.setExpenseType(expenseType);
         }
         CashTransaction saved = transactionRepo.save(transaction);
+        log.info("Transaction saved: ID={}, Amount={}", saved.getId(), saved.getAmount());
+
         // Create audit log
         Map<String, Object> newValues = new HashMap<>();
         newValues.put("amount", saved.getAmount());
         newValues.put("description", saved.getDescription());
         newValues.put("expenseTypeId", saved.getExpenseType() != null ? saved.getExpenseType().getId() : null);
         auditLogService.createAuditLog(user, "EDIT", "CASH_TRANSACTION", id, oldValues, newValues);
+
         // âœ… RECALCULATE SUMMARY if day is closed
         if (dailyCash.getLocked()) {
+            log.info("Day is locked, recalculating summary for DailyCash ID={}", dailyCash.getId());
             try {
                 dailySummaryService.calculateAndSaveDailySummary(dailyCash);
+                log.info("Daily summary recalculated successfully");
             } catch (Exception e) {
                 log.error("Failed to recalculate daily summary: {}", e.getMessage(), e);
+                throw new RuntimeException("Failed to recalculate daily summary: " + e.getMessage(), e);
             }
         }
+
+        log.info("Transaction update completed successfully");
     }
     /**
      * Delete a cash transaction (SUPERADMIN only)
