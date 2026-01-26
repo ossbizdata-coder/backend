@@ -2,6 +2,7 @@ package com.oss.service;
 import com.oss.config.WorkTimeConfig;
 import com.oss.model.Attendance;
 import com.oss.model.AttendanceHistory;
+
 import com.oss.model.User;
 import com.oss.repository.AttendanceRepository;
 import com.oss.repository.UserRepository;
@@ -30,26 +31,24 @@ public class AttendanceService {
     }
     public Attendance getTodayAttendanceForCurrentUser() {
         ZoneId zone = WorkTimeConfig.SRI_LANKA;
-        Instant start = LocalDate.now(zone).atStartOfDay(zone).toInstant();
-        Instant end = LocalDate.now(zone).plusDays(1).atStartOfDay(zone).toInstant();
+        LocalDate today = LocalDate.now(zone);
         return attendanceRepository
-                .findByUserAndWorkDateBetween(getCurrentUser(), start, end)
-                .stream().findFirst().orElse(null);
+                .findByUserAndWorkDate(getCurrentUser(), today)
+                .orElse(null);
     }
     public Attendance checkIn(Instant manualTime) {
         User user = getCurrentUser();
         ZoneId zone = WorkTimeConfig.SRI_LANKA;
-        Instant start = LocalDate.now(zone).atStartOfDay(zone).toInstant();
-        Instant end = LocalDate.now(zone).plusDays(1).atStartOfDay(zone).toInstant();
-        if (!attendanceRepository
-                .findByUserAndWorkDateBetween(user, start, end).isEmpty()) {
+        LocalDate today = LocalDate.now(zone);
+
+        if (attendanceRepository.findByUserAndWorkDate(user, today).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Already checked in");
         }
         Attendance att = new Attendance();
         att.setUser(user);
-        att.setWorkDate(start);
-        att.setCheckInTime(manualTime != null ? manualTime : Instant.now()); // âœ… FIX
-        att.setStatus("CHECKED_IN");
+        att.setWorkDate(today);
+        att.setCheckInTime(manualTime != null ? manualTime : Instant.now());
+        att.setStatus(com.oss.model.AttendanceStatus.CHECKED_IN);
         att.setManualCheckout(false);
         Attendance saved = attendanceRepository.save(att);
         // Create audit log
@@ -68,12 +67,10 @@ public class AttendanceService {
     public Attendance checkOut(Instant manualTime) {
         User user = getCurrentUser();
         ZoneId zone = WorkTimeConfig.SRI_LANKA;
-        Instant start = LocalDate.now(zone).atStartOfDay(zone).toInstant();
-        Instant end = LocalDate.now(zone).plusDays(1).atStartOfDay(zone).toInstant();
+        LocalDate today = LocalDate.now(zone);
+
         Attendance att = attendanceRepository
-                .findByUserAndWorkDateBetween(user, start, end)
-                .stream()
-                .findFirst()
+                .findByUserAndWorkDate(user, today)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.BAD_REQUEST, "Not checked in"));
         if (att.getCheckOutTime() != null) {
@@ -84,10 +81,10 @@ public class AttendanceService {
         oldValues.put("checkOutTime", att.getCheckOutTime());
         oldValues.put("status", att.getStatus());
         oldValues.put("totalMinutes", att.getTotalMinutes());
-        att.setCheckOutTime(manualTime != null ? manualTime : Instant.now()); // âœ… FIX
-        att.setStatus("COMPLETED");
+        att.setCheckOutTime(manualTime != null ? manualTime : Instant.now());
+        att.setStatus(com.oss.model.AttendanceStatus.COMPLETED);
         att.setTotalMinutes(att.getWorkedMinutes());
-        att.setManualCheckout(manualTime != null); // âœ… FIX
+        att.setManualCheckout(manualTime != null);
         Attendance saved = attendanceRepository.save(att);
         // Create audit log
         java.util.Map<String, Object> newValues = new java.util.HashMap<>();
@@ -138,34 +135,58 @@ public class AttendanceService {
         return res;
     }
     // ===================== SALARY CALCULATION =====================
-    // â— UNCHANGED â€” AS REQUESTED
     public Map<String, Object> calculateTodaySalary() {
         User user = getCurrentUser();
         ZoneId zone = WorkTimeConfig.SRI_LANKA;
         LocalDate today = LocalDate.now(zone);
-        Instant start = today.atStartOfDay(zone).toInstant();
-        Instant end = today.plusDays(1).atStartOfDay(zone).toInstant();
-        List<Attendance> attendances = attendanceRepository.findByUserAndWorkDateBetween(user, start, end);
-        double hourlyRate = user.getHourlyRate() != null ? user.getHourlyRate() : 0.0;
+
+        Attendance att = attendanceRepository.findByUserAndWorkDate(user, today).orElse(null);
+
+        double dailySalaryRate = user.getDailySalary() != null ? user.getDailySalary() : 0.0;
+        double deductionRate = user.getDeductionRatePerHour() != null ? user.getDeductionRatePerHour() : 0.0;
         double totalHours = 0.0;
         double totalSalary = 0.0;
+        final double MIN_HOURS = 6.0;
+
         List<Map<String, Object>> dailyBreakdown = new ArrayList<>();
-        for (Attendance att : attendances) {
-            long minutes = att.getTotalMinutes() != null ? att.getTotalMinutes() : 0L;
+
+        if (att != null && att.getTotalMinutes() != null) {
+            long minutes = att.getTotalMinutes();
             double hours = minutes / 60.0;
-            double salary = hours * hourlyRate;
-            totalHours += hours;
-            totalSalary += salary;
+            totalHours = hours;
+
+            // Calculate salary based on new logic
+            if (hours >= MIN_HOURS) {
+                totalSalary = dailySalaryRate;
+
+                // Add overtime
+                if (att.getOvertimeHours() != null && att.getOvertimeHours() > 0) {
+                    totalSalary += att.getOvertimeHours() * (user.getHourlyRate() != null ? user.getHourlyRate() : 0.0);
+                }
+
+                // Subtract deduction
+                if (att.getDeductionHours() != null && att.getDeductionHours() > 0) {
+                    totalSalary -= att.getDeductionHours() * deductionRate;
+                }
+            }
+
             Map<String, Object> breakdown = new HashMap<>();
             breakdown.put("date", today.toString());
             breakdown.put("hours", hours);
-            breakdown.put("salary", salary);
+            breakdown.put("salary", totalSalary);
+            breakdown.put("overtimeHours", att.getOvertimeHours() != null ? att.getOvertimeHours() : 0.0);
+            breakdown.put("deductionHours", att.getDeductionHours() != null ? att.getDeductionHours() : 0.0);
+            breakdown.put("overtimeReason", att.getOvertimeReason());
+            breakdown.put("deductionReason", att.getDeductionReason());
             dailyBreakdown.add(breakdown);
         }
+
         Map<String, Object> result = new HashMap<>();
-        result.put("hourlyRate", hourlyRate);
+        result.put("dailySalary", dailySalaryRate);
+        result.put("deductionRatePerHour", deductionRate);
         result.put("totalHours", totalHours);
         result.put("totalSalary", totalSalary);
+        result.put("minHoursRequired", MIN_HOURS);
         result.put("dailyBreakdown", dailyBreakdown);
         return result;
     }
@@ -174,30 +195,62 @@ public class AttendanceService {
         ZoneId zone = WorkTimeConfig.SRI_LANKA;
         LocalDate firstDay = LocalDate.of(year, month, 1);
         LocalDate lastDay = firstDay.withDayOfMonth(firstDay.lengthOfMonth());
-        Instant start = firstDay.atStartOfDay(zone).toInstant();
-        Instant end = lastDay.plusDays(1).atStartOfDay(zone).toInstant();
-        List<Attendance> attendances = attendanceRepository.findByUserAndWorkDateBetween(user, start, end);
-        double hourlyRate = user.getHourlyRate() != null ? user.getHourlyRate() : 0.0;
-        double totalHours = 0.0;
+
+        List<Attendance> attendances = attendanceRepository.findByUserAndWorkDateBetween(user, firstDay, lastDay);
+
+        double dailySalaryRate = user.getDailySalary() != null ? user.getDailySalary() : 0.0;
+        double deductionRate = user.getDeductionRatePerHour() != null ? user.getDeductionRatePerHour() : 0.0;
         double totalSalary = 0.0;
+        int daysWorked = 0;
+        final double MIN_HOURS = 6.0;
+
         List<Map<String, Object>> dailyBreakdown = new ArrayList<>();
+
         for (Attendance att : attendances) {
-            LocalDate workDate = LocalDate.ofInstant(att.getWorkDate(), zone);
+            if (att.getCheckOutTime() == null) continue;
+
             long minutes = att.getTotalMinutes() != null ? att.getTotalMinutes() : 0L;
             double hours = minutes / 60.0;
-            double salary = hours * hourlyRate;
-            totalHours += hours;
-            totalSalary += salary;
+            double daySalary = 0.0;
+            boolean qualified = false;
+
+            // Check if qualified for full daily salary
+            if (hours >= MIN_HOURS) {
+                daySalary = dailySalaryRate;
+                daysWorked++;
+                qualified = true;
+
+                // Add overtime if any
+                if (att.getOvertimeHours() != null && att.getOvertimeHours() > 0) {
+                    daySalary += att.getOvertimeHours() * (user.getHourlyRate() != null ? user.getHourlyRate() : 0.0);
+                }
+
+                // Deduct if any
+                if (att.getDeductionHours() != null && att.getDeductionHours() > 0) {
+                    daySalary -= att.getDeductionHours() * deductionRate;
+                }
+            }
+
+            totalSalary += daySalary;
+
             Map<String, Object> breakdown = new HashMap<>();
-            breakdown.put("date", workDate.toString());
+            breakdown.put("date", att.getWorkDate().toString());
             breakdown.put("hours", hours);
-            breakdown.put("salary", salary);
+            breakdown.put("salary", daySalary);
+            breakdown.put("overtimeHours", att.getOvertimeHours() != null ? att.getOvertimeHours() : 0.0);
+            breakdown.put("deductionHours", att.getDeductionHours() != null ? att.getDeductionHours() : 0.0);
+            breakdown.put("overtimeReason", att.getOvertimeReason());
+            breakdown.put("deductionReason", att.getDeductionReason());
+            breakdown.put("qualified", qualified);
             dailyBreakdown.add(breakdown);
         }
+
         Map<String, Object> result = new HashMap<>();
-        result.put("hourlyRate", hourlyRate);
-        result.put("totalHours", totalHours);
+        result.put("dailySalary", dailySalaryRate);
+        result.put("deductionRatePerHour", deductionRate);
+        result.put("totalDaysWorked", daysWorked);
         result.put("totalSalary", totalSalary);
+        result.put("minHoursRequired", MIN_HOURS);
         result.put("dailyBreakdown", dailyBreakdown);
         return result;
     }

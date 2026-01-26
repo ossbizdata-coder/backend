@@ -17,6 +17,7 @@ D:\dev\repository\myproject\backend\src\main\java\com\oss\controller\OSS_SalaryC
 D:\dev\repository\myproject\backend\src\main\java\com\oss\model\ExpenseType.java
 D:\dev\repository\myproject\backend\src\main\java\com\oss\repository\ExpenseTypeRepository.java
 D:\dev\repository\myproject\backend\src\main\java\com\oss\dto\BusinessSummaryDTO.java
+D:\dev\repository\myproject\backend\src\main\java\com\oss\model\AttendanceStatus.java
 D:\dev\repository\myproject\backend\src\main\java\com\oss\model\Attendance.java
 D:\dev\repository\myproject\backend\src\main\java\com\oss\repository\TransactionRepository.java
 D:\dev\repository\myproject\backend\src\main\java\com\oss\dto\Foodhut_VariationDTO.java

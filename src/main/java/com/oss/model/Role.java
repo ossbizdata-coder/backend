@@ -1,7 +1,10 @@
 package com.oss.model;
 public enum Role {
-    SUPERADMIN,
     ADMIN,
+    MANAGER,
     STAFF,
-    CUSTOMER
+    CUSTOMER,
+    // Legacy support - map SUPERADMIN to ADMIN
+    @Deprecated
+    SUPERADMIN
 }

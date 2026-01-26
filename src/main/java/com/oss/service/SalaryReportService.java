@@ -36,22 +36,21 @@ public class SalaryReportService {
             int month
                                                         ) {
         User admin = getCurrentUser();
-        if (admin.getRole() != Role.SUPERADMIN) {
+        if (admin.getRole() != Role.SUPERADMIN && admin.getRole() != Role.ADMIN) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
                     "Access denied"
             );
         }
-        ZoneId zone = ZoneId.of("Asia/Colombo");
-        Instant from = LocalDate.of(year, month, 1).atStartOfDay(zone).toInstant();
-        Instant to = LocalDate.of(year, month, 1).withDayOfMonth(LocalDate.of(year, month, 1).lengthOfMonth()).atStartOfDay(zone).toInstant();
+        LocalDate from = LocalDate.of(year, month, 1);
+        LocalDate to = from.withDayOfMonth(from.lengthOfMonth());
         return attendanceRepository.getMonthlyStaffSalary(from, to);
     }
     public Map<String, Object> calculateMyMonthlySalary(int year, int month) {
         User user = getCurrentUser();
         ZoneId zone = ZoneId.of("Asia/Colombo");
-        Instant from = LocalDate.of(year, month, 1).atStartOfDay(zone).toInstant();
-        Instant to = LocalDate.of(year, month, 1).withDayOfMonth(LocalDate.of(year, month, 1).lengthOfMonth()).atStartOfDay(zone).toInstant();
+        LocalDate from = LocalDate.of(year, month, 1);
+        LocalDate to = from.withDayOfMonth(from.lengthOfMonth());
         List<Attendance> list = attendanceRepository.findByUserAndWorkDateBetweenOrderByWorkDateDesc(user, from, to);
         List<OSS_DailySalaryDto> daily = new ArrayList<>();
         double totalSalary = 0.0;
@@ -60,26 +59,22 @@ public class SalaryReportService {
         Double dailySalaryRate = user.getDailySalary() != null ? user.getDailySalary() : 0.0;
         Double deductionRate = user.getDeductionRatePerHour() != null ? user.getDeductionRatePerHour() : 0.0;
         for (Attendance a : list) {
-            if (a.getCheckOutTime() == null) continue;
-            long minutes = a.getWorkedMinutes();
-            double hours = minutes / 60.0;
-            double daySalary = 0.0;
+            double hours = 0.0;
             boolean qualified = false;
-            // Check if qualified for full daily salary
-            if (hours >= MIN_HOURS) {
+            if (a.getCheckInTime() != null && a.getCheckOutTime() != null) {
+                hours = java.time.Duration.between(a.getCheckInTime(), a.getCheckOutTime()).toMinutes() / 60.0;
+                qualified = hours >= MIN_HOURS;
+            }
+            double daySalary = 0.0;
+            if (qualified) {
                 daySalary = dailySalaryRate;
-                daysWorked++;
-                qualified = true;
-                // Add overtime if any
                 if (a.getOvertimeHours() != null && a.getOvertimeHours() > 0) {
-                    double overtimePay = a.getOvertimeHours() * deductionRate;
-                    daySalary += overtimePay;
+                    daySalary += a.getOvertimeHours() * (user.getHourlyRate() != null ? user.getHourlyRate() : 0.0);
                 }
-                // Deduct if any
                 if (a.getDeductionHours() != null && a.getDeductionHours() > 0) {
-                    double deductionAmount = a.getDeductionHours() * deductionRate;
-                    daySalary -= deductionAmount;
+                    daySalary -= a.getDeductionHours() * deductionRate;
                 }
+                daysWorked++;
             } else {
                 // Didn't qualify - no salary if less than 6 hours
                 daySalary = 0.0;
@@ -87,7 +82,7 @@ public class SalaryReportService {
             totalSalary += daySalary;
             // Create daily breakdown with overtime/deduction info
             OSS_DailySalaryDto dayDto = new OSS_DailySalaryDto();
-            dayDto.setDate(a.getWorkDate().atZone(zone).toLocalDate());
+            dayDto.setDate(a.getWorkDate());
             dayDto.setHours(hours);
             dayDto.setSalary(daySalary);
             dayDto.setOvertimeHours(a.getOvertimeHours() != null ? a.getOvertimeHours() : 0.0);
@@ -102,16 +97,15 @@ public class SalaryReportService {
         res.put("deductionRatePerHour", deductionRate);
         res.put("totalDaysWorked", daysWorked);
         res.put("totalSalary", totalSalary);
-        res.put("dailyBreakdown", daily);
         res.put("minHoursRequired", MIN_HOURS);
+        res.put("dailyBreakdown", daily);
         return res;
     }
     public Map<String, Object> getUserMonthlySalary(Long userId, int year, int month) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-        ZoneId zone = ZoneId.of("Asia/Colombo");
-        Instant from = LocalDate.of(year, month, 1).atStartOfDay(zone).toInstant();
-        Instant to = LocalDate.of(year, month, 1).withDayOfMonth(LocalDate.of(year, month, 1).lengthOfMonth()).atStartOfDay(zone).toInstant();
+        LocalDate from = LocalDate.of(year, month, 1);
+        LocalDate to = from.withDayOfMonth(from.lengthOfMonth());
         List<Attendance> list = attendanceRepository.findByUserAndWorkDateBetweenOrderByWorkDateDesc(user, from, to);
         double totalSalary = 0.0;
         int daysWorked = 0;
@@ -130,7 +124,7 @@ public class SalaryReportService {
                 qualified = true;
                 // Add overtime
                 if (a.getOvertimeHours() != null && a.getOvertimeHours() > 0) {
-                    daySalary += a.getOvertimeHours() * deductionRate;
+                    daySalary += a.getOvertimeHours() * (user.getHourlyRate() != null ? user.getHourlyRate() : 0.0);
                 }
                 // Deduct
                 if (a.getDeductionHours() != null && a.getDeductionHours() > 0) {

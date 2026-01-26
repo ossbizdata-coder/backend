@@ -111,6 +111,7 @@ com\oss\dto\OSD_TransactionResponse.class
 com\oss\controller\OSD_TransactionController.class
 com\oss\model\AttendanceHistory.class
 com\oss\dto\ExpenseByCategoryReportDTO.class
+com\oss\model\AttendanceStatus.class
 com\oss\dto\Foodhut_TransactionRequest.class
 com\oss\config\LocalDateAttributeConverter.class
 com\oss\controller\Admin_DailyCashController.class

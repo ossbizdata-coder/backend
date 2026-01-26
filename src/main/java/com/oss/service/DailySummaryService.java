@@ -70,10 +70,8 @@ public class DailySummaryService {
         List<Attendance> allAttendances = attendanceRepo.findAll();
         List<Attendance> attendances = allAttendances.stream()
                 .filter(a -> {
-                    LocalDate attendanceDate = LocalDate.ofInstant(a.getWorkDate(), java.time.ZoneId.systemDefault());
-                    // For now, include all attendances on this date
-                    // TODO: Add shop reference to User or Attendance for better filtering
-                    return attendanceDate.equals(businessDate);
+                    // Use workDate directly (it's already LocalDate)
+                    return a.getWorkDate().equals(businessDate);
                 })
                 .collect(Collectors.toList());
         Integer staffCount = attendances.size();
@@ -140,8 +138,8 @@ public class DailySummaryService {
         List<Attendance> allAttendances = attendanceRepo.findAll();
         List<Attendance> attendances = allAttendances.stream()
                 .filter(a -> {
-                    LocalDate attendanceDate = LocalDate.ofInstant(a.getWorkDate(), java.time.ZoneId.systemDefault());
-                    return attendanceDate.equals(businessDate);
+                    // Use workDate directly (it's already LocalDate)
+                    return a.getWorkDate().equals(businessDate);
                 })
                 .collect(Collectors.toList());
         Integer staffCount = attendances.size();

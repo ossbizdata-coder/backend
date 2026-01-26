@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
@@ -12,18 +13,19 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
     // ======================
     Optional<Attendance> findByUserAndWorkDate(
             User user,
-            Instant workDate
+            LocalDate workDate
                                               );
     List<Attendance> findByUserOrderByWorkDateDesc(User user);
+
     List<Attendance> findByUserAndWorkDateBetween(
             User user,
-            Instant start,
-            Instant end
+            LocalDate start,
+            LocalDate end
                                                  );
     List<Attendance> findByUserAndWorkDateBetweenOrderByWorkDateDesc(
             User user,
-            Instant start,
-            Instant end
+            LocalDate start,
+            LocalDate end
                                                                     );
     // ======================
     // MY ATTENDANCE HISTORY
@@ -72,18 +74,18 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
             u.name,
             SUM(a.totalMinutes),
             SUM(a.totalMinutes) / 60.0,
-            u.hourlyRate,
-            (SUM(a.totalMinutes) / 60.0) * u.hourlyRate
+            u.dailySalary,
+            (SUM(a.totalMinutes) / 60.0) * u.dailySalary
         )
         FROM Attendance a
         JOIN a.user u
         WHERE a.workDate BETWEEN :from AND :to
           AND a.status = 'COMPLETED'
           AND a.totalMinutes IS NOT NULL
-        GROUP BY u.id, u.name, u.hourlyRate
+        GROUP BY u.id, u.name, u.dailySalary
     """)
     List<StaffSalaryReport> getMonthlyStaffSalary(
-            @Param("from") Instant from,
-            @Param("to") Instant to
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to
                                                  );
 }
