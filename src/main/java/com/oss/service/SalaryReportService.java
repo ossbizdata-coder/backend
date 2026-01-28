@@ -1,10 +1,12 @@
 package com.oss.service;
 import com.oss.dto.OSS_DailySalaryDto;
 import com.oss.model.Attendance;
+import com.oss.model.AttendanceStatus;
 import com.oss.model.Role;
 import com.oss.model.StaffSalaryReport;
 import com.oss.model.User;
 import com.oss.repository.AttendanceRepository;
+import com.oss.repository.CreditRepository;
 import com.oss.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -23,6 +25,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SalaryReportService {
     private final AttendanceRepository attendanceRepository;
+    private final CreditRepository creditRepository;
     private final UserRepository userRepository;
     private User getCurrentUser() {
         Authentication auth = SecurityContextHolder
@@ -111,27 +114,60 @@ public class SalaryReportService {
         int daysWorked = 0;
         final double MIN_HOURS = 6.0;
         Double dailySalaryRate = user.getDailySalary() != null ? user.getDailySalary() : 0.0;
+        Double hourlyRate = user.getHourlyRate() != null ? user.getHourlyRate() : 0.0;
         Double deductionRate = user.getDeductionRatePerHour() != null ? user.getDeductionRatePerHour() : 0.0;
         List<Map<String, Object>> dailyBreakdown = new ArrayList<>();
+
         for (Attendance a : list) {
-            long minutes = a.getWorkedMinutes();
-            double hours = minutes / 60.0;
+            double hours = 0.0;
             double daySalary = 0.0;
             boolean qualified = false;
-            if (hours >= MIN_HOURS) {
+
+            // ✅ FIX: Handle legacy "WORKING" status records without timestamps
+            if (a.getStatus() == AttendanceStatus.WORKING && a.getCheckInTime() == null && a.getCheckOutTime() == null) {
+                // Legacy record - assume full day worked (8 hours)
+                hours = 8.0;
+                qualified = true;
                 daySalary = dailySalaryRate;
                 daysWorked++;
-                qualified = true;
-                // Add overtime
+
+                // Still apply overtime and deductions
                 if (a.getOvertimeHours() != null && a.getOvertimeHours() > 0) {
-                    daySalary += a.getOvertimeHours() * (user.getHourlyRate() != null ? user.getHourlyRate() : 0.0);
+                    daySalary += a.getOvertimeHours() * hourlyRate;
                 }
-                // Deduct
                 if (a.getDeductionHours() != null && a.getDeductionHours() > 0) {
                     daySalary -= a.getDeductionHours() * deductionRate;
                 }
             }
+            // ✅ Handle modern records with timestamps
+            else if (a.getCheckInTime() != null && a.getCheckOutTime() != null) {
+                long minutes = a.getWorkedMinutes();
+                hours = minutes / 60.0;
+
+                if (hours >= MIN_HOURS) {
+                    daySalary = dailySalaryRate;
+                    daysWorked++;
+                    qualified = true;
+
+                    // Add overtime
+                    if (a.getOvertimeHours() != null && a.getOvertimeHours() > 0) {
+                        daySalary += a.getOvertimeHours() * hourlyRate;
+                    }
+                    // Deduct
+                    if (a.getDeductionHours() != null && a.getDeductionHours() > 0) {
+                        daySalary -= a.getDeductionHours() * deductionRate;
+                    }
+                }
+            }
+            // ✅ Handle NOT_WORKING or incomplete records
+            else if (a.getStatus() == AttendanceStatus.NOT_WORKING) {
+                hours = 0.0;
+                qualified = false;
+                daySalary = 0.0;
+            }
+
             totalSalary += daySalary;
+
             Map<String, Object> day = new HashMap<>();
             day.put("date", a.getWorkDate().toString());
             day.put("hours", hours);
@@ -141,16 +177,31 @@ public class SalaryReportService {
             day.put("overtimeReason", a.getOvertimeReason());
             day.put("deductionReason", a.getDeductionReason());
             day.put("qualified", qualified);
+            day.put("status", a.getStatus().name());
             dailyBreakdown.add(day);
         }
+
         Map<String, Object> res = new HashMap<>();
         res.put("userId", user.getId());
         res.put("name", user.getName());
         res.put("email", user.getEmail());
         res.put("dailySalary", dailySalaryRate);
+        res.put("hourlyRate", hourlyRate);
         res.put("deductionRatePerHour", deductionRate);
         res.put("totalDaysWorked", daysWorked);
-        res.put("totalSalary", totalSalary);
+
+        // ✅ NEW: Get credits for this month and deduct from salary
+        Double totalCredits = creditRepository.sumCreditsByUserIdAndDateRange(userId, from, to);
+        if (totalCredits == null) {
+            totalCredits = 0.0;
+        }
+
+        // Calculate final salary after credits deduction
+        double finalSalary = totalSalary - totalCredits;
+
+        res.put("baseSalary", totalSalary);        // Salary before credits
+        res.put("totalCredits", totalCredits);      // Credits to deduct
+        res.put("totalSalary", finalSalary);        // Final salary after credits
         res.put("dailyBreakdown", dailyBreakdown);
         res.put("minHoursRequired", MIN_HOURS);
         return res;

@@ -27,6 +27,10 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
             LocalDate start,
             LocalDate end
                                                                     );
+
+    // Find all attendance records for a specific work date (for daily summary)
+    List<Attendance> findByWorkDate(LocalDate workDate);
+
     // ======================
     // MY ATTENDANCE HISTORY
     // ======================

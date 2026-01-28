@@ -65,15 +65,11 @@ public class DailySummaryService {
         Double netSales = totalRevenue - totalCredits;
         // Calculate profit: Revenue - Expenses
         Double profit = totalRevenue - totalExpenses;
-        // Get staff metrics - find attendances by business date for this shop
-        // We'll match based on the daily cash shop
-        List<Attendance> allAttendances = attendanceRepo.findAll();
-        List<Attendance> attendances = allAttendances.stream()
-                .filter(a -> {
-                    // Use workDate directly (it's already LocalDate)
-                    return a.getWorkDate().equals(businessDate);
-                })
-                .collect(Collectors.toList());
+
+        // Get staff metrics - find attendances by business date
+        // ✅ OPTIMIZED: Query only records for this date instead of loading ALL records
+        List<Attendance> attendances = attendanceRepo.findByWorkDate(businessDate);
+
         Integer staffCount = attendances.size();
         Double totalAttendanceHours = attendances.stream()
                 .filter(a -> a.getCheckOutTime() != null && a.getCheckInTime() != null)
@@ -135,13 +131,10 @@ public class DailySummaryService {
         Double totalRevenue = cashDifference + totalExpenses;
         Double netSales = totalRevenue - totalCredits;
         Double profit = totalRevenue - totalExpenses;
-        List<Attendance> allAttendances = attendanceRepo.findAll();
-        List<Attendance> attendances = allAttendances.stream()
-                .filter(a -> {
-                    // Use workDate directly (it's already LocalDate)
-                    return a.getWorkDate().equals(businessDate);
-                })
-                .collect(Collectors.toList());
+
+        // ✅ OPTIMIZED: Query only records for this date instead of loading ALL records
+        List<Attendance> attendances = attendanceRepo.findByWorkDate(businessDate);
+
         Integer staffCount = attendances.size();
         Double totalAttendanceHours = attendances.stream()
                 .filter(a -> a.getCheckOutTime() != null && a.getCheckInTime() != null)
