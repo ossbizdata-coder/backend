@@ -71,12 +71,10 @@ public class DailySummaryService {
         List<Attendance> attendances = attendanceRepo.findByWorkDate(businessDate);
 
         Integer staffCount = attendances.size();
+        // ✅ NEW LOGIC: Count working days and calculate hours (8 hours per working day)
         Double totalAttendanceHours = attendances.stream()
-                .filter(a -> a.getCheckOutTime() != null && a.getCheckInTime() != null)
-                .mapToDouble(a -> {
-                    long durationMinutes = java.time.Duration.between(a.getCheckInTime(), a.getCheckOutTime()).toMinutes();
-                    return durationMinutes / 60.0; // Convert to hours
-                })
+                .filter(a -> a.getIsWorking() != null && a.getIsWorking())
+                .mapToDouble(a -> 8.0) // Standard 8-hour workday
                 .sum();
         // Get manual sales count - DailyCash doesn't have manualSales collection, default to 0
         int manualSaleCount = 0;
@@ -136,12 +134,10 @@ public class DailySummaryService {
         List<Attendance> attendances = attendanceRepo.findByWorkDate(businessDate);
 
         Integer staffCount = attendances.size();
+        // ✅ NEW LOGIC: Count working days and calculate hours (8 hours per working day)
         Double totalAttendanceHours = attendances.stream()
-                .filter(a -> a.getCheckOutTime() != null && a.getCheckInTime() != null)
-                .mapToDouble(a -> {
-                    long durationMinutes = java.time.Duration.between(a.getCheckInTime(), a.getCheckOutTime()).toMinutes();
-                    return durationMinutes / 60.0;
-                })
+                .filter(a -> a.getIsWorking() != null && a.getIsWorking())
+                .mapToDouble(a -> 8.0) // Standard 8-hour workday
                 .sum();
         int manualSaleCount = 0;
         // Update existing summary

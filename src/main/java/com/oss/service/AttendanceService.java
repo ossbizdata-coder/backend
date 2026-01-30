@@ -43,71 +43,122 @@ public class AttendanceService {
     public Attendance getTodayAttendanceForCurrentUser() {
         ZoneId zone = WorkTimeConfig.SRI_LANKA;
         LocalDate today = LocalDate.now(zone);
+        // ✅ Get LATEST record to handle duplicates
         return attendanceRepository
-                .findByUserAndWorkDate(getCurrentUser(), today)
+                .findLatestByUserAndWorkDate(getCurrentUser(), today)
                 .orElse(null);
     }
     public Attendance checkIn(Instant manualTime) {
+        return checkIn(manualTime, null);
+    }
+
+    public Attendance checkIn(Instant manualTime, String timezone) {
         User user = getCurrentUser();
-        ZoneId zone = WorkTimeConfig.SRI_LANKA;
+
+        // ✅ Use timezone from request, or default to configured zone
+        ZoneId zone = timezone != null ? ZoneId.of(timezone) : WorkTimeConfig.DEFAULT_ZONE;
         LocalDate today = LocalDate.now(zone);
 
-        Optional<Attendance> existingOpt = attendanceRepository.findByUserAndWorkDate(user, today);
+        // Find or create today's attendance record - use the LATEST (bulletproof)
+        Optional<Attendance> existingOpt = attendanceRepository.findLatestByUserAndWorkDate(user, today);
 
+        Attendance attendance;
         if (existingOpt.isPresent()) {
-            // Update existing record instead of creating duplicate
-            Attendance attendance = existingOpt.get();
-            attendance.setCheckInTime(Instant.now());
-            attendance.setStatus(AttendanceStatus.CHECKED_IN);
-            attendance.setCheckOutTime(null); // Clear checkout if re-checking in
-            return attendanceRepository.save(attendance);
+            attendance = existingOpt.get();
+            System.out.println("✅ checkIn: Updating EXISTING record ID: " + attendance.getId());
+        } else {
+            attendance = new Attendance();
+            attendance.setUser(user);
+            attendance.setWorkDate(today);
+            System.out.println("✅ checkIn: Creating NEW record for: " + today);
         }
 
-        // Create new record for today
-        Attendance att = new Attendance();
-        att.setUser(user);
-        att.setWorkDate(today);
-        att.setCheckInTime(Instant.now());
-        att.setStatus(AttendanceStatus.CHECKED_IN);
-        att.setManualCheckout(false);
-        Attendance saved = attendanceRepository.save(att);
-        // Create audit log
-        java.util.Map<String, Object> newValues = new java.util.HashMap<>();
-        newValues.put("id", saved.getId());
-        newValues.put("userId", user.getId());
-        newValues.put("workDate", saved.getWorkDate().toString());
-        newValues.put("checkInTime", saved.getCheckInTime().toString());
-        newValues.put("status", "CHECKED_IN");
-        newValues.put("manualCheckIn", manualTime != null);
-        auditLogService.createAuditLog(user, "CHECK_IN", "ATTENDANCE", saved.getId(), null, newValues);
-        return saved;
+        // Simple logic: User clicked YES
+        attendance.setIsWorking(true);  // ✅ SIMPLE FLAG
+        attendance.setStatus(AttendanceStatus.WORKING);  // For compatibility
+
+        // Save and return
+        return attendanceRepository.save(attendance);
     }
     // Change checkOut to return Attendance instead of void
     @Transactional
     public Attendance checkOut(Instant manualTime) {
+        return checkOut(manualTime, null);
+    }
+
+    @Transactional
+    public Attendance checkOut(Instant manualTime, String timezone) {
+        User user = getCurrentUser();
+
+        // ✅ Use timezone from request, or default to configured zone
+        ZoneId zone = timezone != null ? ZoneId.of(timezone) : WorkTimeConfig.DEFAULT_ZONE;
+        LocalDate today = LocalDate.now(zone);
+
+        // ✅ BULLETPROOF: Find existing record first
+        Optional<Attendance> existingOpt = attendanceRepository.findLatestByUserAndWorkDate(user, today);
+
+        Attendance attendance;
+        if (existingOpt.isPresent()) {
+            attendance = existingOpt.get();
+            System.out.println("✅ checkOut: Updating EXISTING record ID: " + attendance.getId());
+        } else {
+            attendance = new Attendance();
+            attendance.setUser(user);
+            attendance.setWorkDate(today);
+            System.out.println("✅ checkOut: Creating NEW record for: " + today);
+        }
+
+        // Update to NOT_WORKING status
+        attendance.setIsWorking(false);
+        attendance.setStatus(AttendanceStatus.NOT_WORKING);
+
+        return attendanceRepository.save(attendance);
+    }
+
+    /**
+     * Update today's attendance status
+     * Used by mobile app to set WORKING or NOT_WORKING when user clicks YES/NO
+     */
+    @Transactional
+    public Attendance updateTodayStatus(String statusString) {
         User user = getCurrentUser();
         ZoneId zone = WorkTimeConfig.SRI_LANKA;
         LocalDate today = LocalDate.now(zone);
 
-        Optional<Attendance> existingOpt = attendanceRepository.findByUserAndWorkDate(user, today);
+        // Validate and parse status
+        AttendanceStatus status;
+        try {
+            status = AttendanceStatus.valueOf(statusString.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid status. Must be: WORKING or NOT_WORKING");
+        }
 
+        // ✅ BULLETPROOF: Find existing record first
+        Optional<Attendance> existingOpt = attendanceRepository.findLatestByUserAndWorkDate(user, today);
+
+        Attendance attendance;
         if (existingOpt.isPresent()) {
-            // Update existing record
-            Attendance attendance = existingOpt.get();
-            attendance.setCheckOutTime(Instant.now());
-            attendance.setStatus(AttendanceStatus.COMPLETED);
-            attendance.setTotalMinutes(attendance.getWorkedMinutes());
-            return attendanceRepository.save(attendance);
+            // ✅ CRITICAL: Use existing record to ensure UPDATE not INSERT
+            attendance = existingOpt.get();
+            System.out.println("✅ Updating EXISTING record ID: " + attendance.getId() + " for date: " + today);
         } else {
-            // Create new record with checkout only
-            Attendance attendance = new Attendance();
+            // Create new record only if none exists
+            attendance = new Attendance();
             attendance.setUser(user);
             attendance.setWorkDate(today);
-            attendance.setCheckOutTime(Instant.now());
-            attendance.setStatus(AttendanceStatus.COMPLETED);
-            return attendanceRepository.save(attendance);
+            System.out.println("✅ Creating NEW record for date: " + today);
         }
+
+        // Update status
+        attendance.setStatus(status);
+        attendance.setIsWorking(status != AttendanceStatus.NOT_WORKING);
+
+        Attendance saved = attendanceRepository.save(attendance);
+        System.out.println("✅ Saved record ID: " + saved.getId() + " with status: " + saved.getStatus());
+
+        return saved;
     }
+
     public List<AttendanceHistory> getMyAttendanceHistory() {
         return attendanceRepository.getMyHistory(getCurrentUser());
     }
@@ -133,12 +184,8 @@ public class AttendanceService {
                 map.put("userEmail", "");
             }
             map.put("workDate", a.getWorkDate() != null ? a.getWorkDate().toString() : "");
-            map.put("checkInTime", a.getCheckInTime() != null ? a.getCheckInTime().toString() : "");
-            map.put("checkOutTime", a.getCheckOutTime() != null ? a.getCheckOutTime().toString() : "");
             map.put("status", a.getStatus() != null ? a.getStatus() : "");
-            map.put("manualCheckout", a.isManualCheckout());
-            map.put("totalMinutes", a.getTotalMinutes() != null ? a.getTotalMinutes() : 0);
-            // Add overtime/deduction fields
+            map.put("isWorking", a.getIsWorking() != null ? a.getIsWorking() : true);
             map.put("overtimeHours", a.getOvertimeHours() != null ? a.getOvertimeHours() : 0.0);
             map.put("deductionHours", a.getDeductionHours() != null ? a.getDeductionHours() : 0.0);
             map.put("overtimeReason", a.getOvertimeReason() != null ? a.getOvertimeReason() : "");
@@ -153,34 +200,30 @@ public class AttendanceService {
         ZoneId zone = WorkTimeConfig.SRI_LANKA;
         LocalDate today = LocalDate.now(zone);
 
-        Attendance att = attendanceRepository.findByUserAndWorkDate(user, today).orElse(null);
+        // ✅ Get LATEST record to handle duplicates
+        Attendance att = attendanceRepository.findLatestByUserAndWorkDate(user, today).orElse(null);
 
         double dailySalaryRate = user.getDailySalary() != null ? user.getDailySalary() : 0.0;
+        double hourlyRate = user.getHourlyRate() != null ? user.getHourlyRate() : 0.0;
         double deductionRate = user.getDeductionRatePerHour() != null ? user.getDeductionRatePerHour() : 0.0;
-        double totalHours = 0.0;
         double totalSalary = 0.0;
-        final double MIN_HOURS = 6.0;
+        double hours = 0.0;
 
         List<Map<String, Object>> dailyBreakdown = new ArrayList<>();
 
-        if (att != null && att.getTotalMinutes() != null) {
-            long minutes = att.getTotalMinutes();
-            double hours = minutes / 60.0;
-            totalHours = hours;
+        if (att != null && att.getIsWorking() != null && att.getIsWorking()) {
+            // User clicked YES - they worked today
+            hours = 8.0;  // Standard work day
+            totalSalary = dailySalaryRate;
 
-            // Calculate salary based on new logic
-            if (hours >= MIN_HOURS) {
-                totalSalary = dailySalaryRate;
+            // Add overtime
+            if (att.getOvertimeHours() != null && att.getOvertimeHours() > 0) {
+                totalSalary += att.getOvertimeHours() * hourlyRate;
+            }
 
-                // Add overtime
-                if (att.getOvertimeHours() != null && att.getOvertimeHours() > 0) {
-                    totalSalary += att.getOvertimeHours() * (user.getHourlyRate() != null ? user.getHourlyRate() : 0.0);
-                }
-
-                // Subtract deduction
-                if (att.getDeductionHours() != null && att.getDeductionHours() > 0) {
-                    totalSalary -= att.getDeductionHours() * deductionRate;
-                }
+            // Subtract deduction
+            if (att.getDeductionHours() != null && att.getDeductionHours() > 0) {
+                totalSalary -= att.getDeductionHours() * deductionRate;
             }
 
             Map<String, Object> breakdown = new HashMap<>();
@@ -196,10 +239,10 @@ public class AttendanceService {
 
         Map<String, Object> result = new HashMap<>();
         result.put("dailySalary", dailySalaryRate);
+        result.put("hourlyRate", hourlyRate);
         result.put("deductionRatePerHour", deductionRate);
-        result.put("totalHours", totalHours);
+        result.put("totalHours", hours);
         result.put("totalSalary", totalSalary);
-        result.put("minHoursRequired", MIN_HOURS);
         result.put("dailyBreakdown", dailyBreakdown);
         return result;
     }
@@ -224,57 +267,26 @@ public class AttendanceService {
             double daySalary = 0.0;
             boolean qualified = false;
 
-            // ✅ FIX: Handle legacy "WORKING" status records without timestamps
-            if (att.getStatus() == AttendanceStatus.WORKING && att.getCheckInTime() == null && att.getCheckOutTime() == null) {
-                // Legacy record - assume full day worked (8 hours)
+            // ✅ SIMPLE LOGIC: Just check the isWorking flag
+            if (att.getIsWorking() != null && att.getIsWorking()) {
+                // User clicked YES - they worked
                 hours = 8.0;
                 qualified = true;
                 daySalary = dailySalaryRate;
                 daysWorked++;
 
-                // Still apply overtime and deductions from the record
+                // Add overtime if any
                 if (att.getOvertimeHours() != null && att.getOvertimeHours() > 0) {
                     daySalary += att.getOvertimeHours() * hourlyRate;
                 }
+
+                // Deduct if any
                 if (att.getDeductionHours() != null && att.getDeductionHours() > 0) {
                     daySalary -= att.getDeductionHours() * deductionRate;
                 }
-            }
-            // ✅ Handle modern records with timestamps
-            else if (att.getCheckInTime() != null && att.getCheckOutTime() != null) {
-                long minutes = att.getTotalMinutes() != null ? att.getTotalMinutes() : 0L;
-                hours = minutes / 60.0;
-
-                // Check if qualified for full daily salary
-                if (hours >= MIN_HOURS) {
-                    daySalary = dailySalaryRate;
-                    daysWorked++;
-                    qualified = true;
-
-                    // Add overtime if any
-                    if (att.getOvertimeHours() != null && att.getOvertimeHours() > 0) {
-                        daySalary += att.getOvertimeHours() * hourlyRate;
-                    }
-
-                    // Deduct if any
-                    if (att.getDeductionHours() != null && att.getDeductionHours() > 0) {
-                        daySalary -= att.getDeductionHours() * deductionRate;
-                    }
-                }
-            }
-            // ✅ Handle NOT_WORKING status
-            else if (att.getStatus() == AttendanceStatus.NOT_WORKING) {
+            } else {
+                // User clicked NO - they didn't work
                 hours = 0.0;
-                qualified = false;
-                daySalary = 0.0;
-            }
-            // ✅ Handle incomplete records (checked in but not checked out)
-            else {
-                // Still in progress or incomplete - don't count
-                if (att.getCheckInTime() != null) {
-                    long minutes = att.getTotalMinutes() != null ? att.getTotalMinutes() : 0L;
-                    hours = minutes / 60.0;
-                }
                 qualified = false;
                 daySalary = 0.0;
             }

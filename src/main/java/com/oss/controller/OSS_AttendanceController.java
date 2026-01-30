@@ -35,21 +35,85 @@ public class OSS_AttendanceController {
         }
         return ResponseEntity.ok(attendance);
     }
+
+    /**
+     * PUT /api/attendance/today
+     * Update today's attendance status
+     * Used by mobile app to set NOT_WORKING status when user clicks "NO"
+     */
+    @PutMapping("/today")
+    public ResponseEntity<?> updateTodayStatus(
+            @RequestBody Map<String, String> body) {
+        try {
+            String status = body.get("status");
+            if (status == null || status.trim().isEmpty()) {
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Status is required"));
+            }
+
+            Attendance attendance = service.updateTodayStatus(status);
+            return ResponseEntity.ok(attendance);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", "Failed to update status: " + e.getMessage()));
+        }
+    }
+
     @PostMapping("/check-in")
     public Attendance checkIn(
             @RequestBody(required = false) Map<String, String> body) {
         Instant t = body != null && body.containsKey("checkInTime")
                     ? Instant.parse(body.get("checkInTime"))
                     : null;
-        return service.checkIn(t);
+        String timezone = body != null ? body.get("timezone") : null;
+        return service.checkIn(t, timezone);
     }
+
     @PostMapping("/check-out")
     public Attendance checkOut(
             @RequestBody(required = false) Map<String, String> body) {
         Instant t = body != null && body.containsKey("checkOutTime")
                     ? Instant.parse(body.get("checkOutTime"))
                     : null;
-        return service.checkOut(t);
+        String timezone = body != null ? body.get("timezone") : null;
+        return service.checkOut(t, timezone);
+    }
+
+    /**
+     * POST /api/attendance/not-working
+     * Simple endpoint to mark as NOT WORKING (NO button)
+     * Accepts timezone from client
+     */
+    @PostMapping("/not-working")
+    public ResponseEntity<?> markNotWorking(@RequestBody(required = false) Map<String, String> body) {
+        try {
+            String timezone = body != null ? body.get("timezone") : null;
+            Attendance attendance = service.checkOut(null, timezone);
+            return ResponseEntity.ok(attendance);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", "Failed to mark as not working: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * POST /api/attendance/working
+     * Simple endpoint to mark as WORKING (YES button)
+     * Accepts timezone from client
+     */
+    @PostMapping("/working")
+    public ResponseEntity<?> markWorking(@RequestBody(required = false) Map<String, String> body) {
+        try {
+            String timezone = body != null ? body.get("timezone") : null;
+            Attendance attendance = service.checkIn(null, timezone);
+            return ResponseEntity.ok(attendance);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", "Failed to mark as working: " + e.getMessage()));
+        }
     }
     @GetMapping("/history")
     public List<AttendanceHistory> history() {

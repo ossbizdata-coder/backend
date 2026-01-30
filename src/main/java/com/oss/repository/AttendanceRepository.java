@@ -3,7 +3,6 @@ import com.oss.model.*;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -15,6 +14,15 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
             User user,
             LocalDate workDate
                                               );
+
+    // ✅ Get the LATEST attendance record for a user on a specific date
+    // Ordered by ID DESC to get the most recent if duplicates exist
+    @Query("SELECT a FROM Attendance a WHERE a.user = :user AND a.workDate = :workDate ORDER BY a.id DESC")
+    Optional<Attendance> findLatestByUserAndWorkDate(
+            @Param("user") User user,
+            @Param("workDate") LocalDate workDate
+                                                    );
+
     List<Attendance> findByUserOrderByWorkDateDesc(User user);
 
     List<Attendance> findByUserAndWorkDateBetween(
@@ -36,12 +44,14 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
     // ======================
     @Query("""
         SELECT new com.oss.model.AttendanceHistory(
+            a.id,
             a.workDate,
-            a.checkInTime,
-            a.checkOutTime,
-            a.totalMinutes,
-            a.manualCheckout,
-            a.status
+            a.status,
+            a.isWorking,
+            a.overtimeHours,
+            a.deductionHours,
+            a.overtimeReason,
+            a.deductionReason
         )
         FROM Attendance a
         WHERE a.user = :user
@@ -59,8 +69,8 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
             u.name,
             u.email,
             COUNT(a),
-            SUM(CASE WHEN a.checkInTime IS NOT NULL THEN 1 ELSE 0 END),
-            SUM(CASE WHEN a.checkOutTime IS NOT NULL THEN 1 ELSE 0 END)
+            SUM(CASE WHEN a.isWorking = true THEN 1 ELSE 0 END),
+            SUM(CASE WHEN a.isWorking = false THEN 1 ELSE 0 END)
         )
         FROM Attendance a
         JOIN a.user u
@@ -68,24 +78,24 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
     """)
     List<StaffAttendanceReport> getAttendanceReportGroupedByUser();
     // ======================
-    // STAFF SALARY REPORT (SAFE VERSION)
+    // STAFF SALARY REPORT (NEW SIMPLIFIED VERSION)
     // ======================
-    // âŒ REMOVED TIMESTAMPDIFF (DB specific)
-    // âœ” Uses pre-calculated totalMinutes
+    // ✅ Uses daily salary + overtime/deduction adjustments
     @Query("""
         SELECT new com.oss.model.StaffSalaryReport(
             u.id,
             u.name,
-            SUM(a.totalMinutes),
-            SUM(a.totalMinutes) / 60.0,
+            COUNT(CASE WHEN a.isWorking = true THEN 1 END),
+            SUM(COALESCE(a.overtimeHours, 0)),
+            SUM(COALESCE(a.deductionHours, 0)),
             u.dailySalary,
-            (SUM(a.totalMinutes) / 60.0) * u.dailySalary
+            (COUNT(CASE WHEN a.isWorking = true THEN 1 END) * u.dailySalary)
+                + (SUM(COALESCE(a.overtimeHours, 0)) * (u.dailySalary / 8.0))
+                - (SUM(COALESCE(a.deductionHours, 0)) * (u.dailySalary / 8.0))
         )
         FROM Attendance a
         JOIN a.user u
         WHERE a.workDate BETWEEN :from AND :to
-          AND a.status = 'COMPLETED'
-          AND a.totalMinutes IS NOT NULL
         GROUP BY u.id, u.name, u.dailySalary
     """)
     List<StaffSalaryReport> getMonthlyStaffSalary(

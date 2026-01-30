@@ -14,7 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
-import java.time.Instant;
+
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -58,16 +58,19 @@ public class SalaryReportService {
         List<OSS_DailySalaryDto> daily = new ArrayList<>();
         double totalSalary = 0.0;
         int daysWorked = 0;
-        final double MIN_HOURS = 6.0; // Minimum hours to qualify for full daily salary
+
         Double dailySalaryRate = user.getDailySalary() != null ? user.getDailySalary() : 0.0;
         Double deductionRate = user.getDeductionRatePerHour() != null ? user.getDeductionRatePerHour() : 0.0;
         for (Attendance a : list) {
             double hours = 0.0;
             boolean qualified = false;
-            if (a.getCheckInTime() != null && a.getCheckOutTime() != null) {
-                hours = java.time.Duration.between(a.getCheckInTime(), a.getCheckOutTime()).toMinutes() / 60.0;
-                qualified = hours >= MIN_HOURS;
+
+            // ✅ NEW LOGIC: Use isWorking flag instead of check-in/check-out times
+            if (a.getIsWorking() != null && a.getIsWorking()) {
+                hours = 8.0; // Standard 8-hour workday
+                qualified = true;
             }
+
             double daySalary = 0.0;
             if (qualified) {
                 daySalary = dailySalaryRate;
@@ -79,7 +82,7 @@ public class SalaryReportService {
                 }
                 daysWorked++;
             } else {
-                // Didn't qualify - no salary if less than 6 hours
+                // User marked as NOT_WORKING - no salary
                 daySalary = 0.0;
             }
             totalSalary += daySalary;
@@ -100,7 +103,6 @@ public class SalaryReportService {
         res.put("deductionRatePerHour", deductionRate);
         res.put("totalDaysWorked", daysWorked);
         res.put("totalSalary", totalSalary);
-        res.put("minHoursRequired", MIN_HOURS);
         res.put("dailyBreakdown", daily);
         return res;
     }
@@ -123,44 +125,27 @@ public class SalaryReportService {
             double daySalary = 0.0;
             boolean qualified = false;
 
-            // ✅ FIX: Handle legacy "WORKING" status records without timestamps
-            if (a.getStatus() == AttendanceStatus.WORKING && a.getCheckInTime() == null && a.getCheckOutTime() == null) {
-                // Legacy record - assume full day worked (8 hours)
-                hours = 8.0;
+            // ✅ SIMPLE LOGIC: Status-based only, ignore timestamps
+            if (a.getStatus() == AttendanceStatus.WORKING ||
+                a.getStatus() == AttendanceStatus.CHECKED_IN ||
+                a.getStatus() == AttendanceStatus.COMPLETED) {
+                // User clicked YES or it's a legacy WORKING record
+                hours = 8.0;  // Always 8 hours for working days
                 qualified = true;
                 daySalary = dailySalaryRate;
                 daysWorked++;
 
-                // Still apply overtime and deductions
+                // Add overtime
                 if (a.getOvertimeHours() != null && a.getOvertimeHours() > 0) {
                     daySalary += a.getOvertimeHours() * hourlyRate;
                 }
+                // Deduct
                 if (a.getDeductionHours() != null && a.getDeductionHours() > 0) {
                     daySalary -= a.getDeductionHours() * deductionRate;
                 }
             }
-            // ✅ Handle modern records with timestamps
-            else if (a.getCheckInTime() != null && a.getCheckOutTime() != null) {
-                long minutes = a.getWorkedMinutes();
-                hours = minutes / 60.0;
-
-                if (hours >= MIN_HOURS) {
-                    daySalary = dailySalaryRate;
-                    daysWorked++;
-                    qualified = true;
-
-                    // Add overtime
-                    if (a.getOvertimeHours() != null && a.getOvertimeHours() > 0) {
-                        daySalary += a.getOvertimeHours() * hourlyRate;
-                    }
-                    // Deduct
-                    if (a.getDeductionHours() != null && a.getDeductionHours() > 0) {
-                        daySalary -= a.getDeductionHours() * deductionRate;
-                    }
-                }
-            }
-            // ✅ Handle NOT_WORKING or incomplete records
             else if (a.getStatus() == AttendanceStatus.NOT_WORKING) {
+                // User clicked NO
                 hours = 0.0;
                 qualified = false;
                 daySalary = 0.0;

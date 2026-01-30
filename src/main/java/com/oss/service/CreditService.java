@@ -110,7 +110,7 @@ public class CreditService {
         newValues.put("isPaid", isPaid);
         auditLogService.createAuditLog(credit.getUser(), "UPDATE_PAID_STATUS", "CREDIT", id, oldValues, newValues);
     }
-    private OSD_CreditDTO convertToDTO(Credit credit) {
+    public OSD_CreditDTO convertToDTO(Credit credit) {
         OSD_CreditDTO dto = new OSD_CreditDTO();
         dto.setId(credit.getId());
         dto.setUserId(credit.getUser().getId());

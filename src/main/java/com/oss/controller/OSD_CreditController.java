@@ -1,6 +1,8 @@
 package com.oss.controller;
 import com.oss.dto.OSD_CreditDTO;
+import com.oss.model.Credit;
 import com.oss.model.User;
+import com.oss.repository.CreditRepository;
 import com.oss.repository.UserRepository;
 import com.oss.service.CreditService;
 import org.slf4j.Logger;
@@ -10,8 +12,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.security.Principal;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/credits")
 public class OSD_CreditController {
@@ -20,6 +24,8 @@ public class OSD_CreditController {
     private CreditService creditService;
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private CreditRepository creditRepository;
     @GetMapping
     public List<OSD_CreditDTO> getAllCredits() {
         return creditService.getAllCredits();
@@ -105,6 +111,162 @@ public class OSD_CreditController {
         } catch (RuntimeException e) {
             log.error("Error updating credit {}: {}", id, e.getMessage());
             return ResponseEntity.status(404).body(e.getMessage());
+        }
+    }
+
+    // ==================== STAFF MEMBER CREDITS APIs ====================
+
+    /**
+     * GET /api/credits/me
+     * Get all credits for the current logged-in user
+     */
+    @GetMapping("/me")
+    public ResponseEntity<List<OSD_CreditDTO>> getMyCredits(Principal principal) {
+        try {
+            User user = userRepository.findByEmail(principal.getName())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            List<Credit> credits = creditRepository.findByUserId(user.getId());
+
+            List<OSD_CreditDTO> dtos = credits.stream()
+                    .map(creditService::convertToDTO)
+                    .collect(Collectors.toList());
+
+            return ResponseEntity.ok(dtos);
+        } catch (Exception e) {
+            log.error("Error fetching user credits: {}", e.getMessage());
+            return ResponseEntity.status(500).build();
+        }
+    }
+
+    /**
+     * GET /api/credits/me/summary
+     * Get credits summary for current user (total, paid, unpaid)
+     */
+    @GetMapping("/me/summary")
+    public ResponseEntity<Map<String, Object>> getMyCreditsSummary(Principal principal) {
+        try {
+            User user = userRepository.findByEmail(principal.getName())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            Double totalCredits = creditRepository.sumCreditsByUserId(user.getId());
+            Double unpaidCredits = creditRepository.sumUnpaidCreditsByUserId(user.getId());
+            Double paidCredits = creditRepository.sumPaidCreditsByUserId(user.getId());
+
+            Map<String, Object> summary = new HashMap<>();
+            summary.put("totalCredits", totalCredits != null ? totalCredits : 0.0);
+            summary.put("unpaidCredits", unpaidCredits != null ? unpaidCredits : 0.0);
+            summary.put("paidCredits", paidCredits != null ? paidCredits : 0.0);
+            summary.put("userId", user.getId());
+            summary.put("userName", user.getName());
+
+            return ResponseEntity.ok(summary);
+        } catch (Exception e) {
+            log.error("Error fetching credits summary: {}", e.getMessage());
+            return ResponseEntity.status(500).build();
+        }
+    }
+
+    /**
+     * GET /api/credits/me/total
+     * Get total credits (all time) for the current logged-in user
+     */
+    @GetMapping("/me/total")
+    public ResponseEntity<Map<String, Object>> getMyTotalCredits(Principal principal) {
+        try {
+            User user = userRepository.findByEmail(principal.getName())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            Double totalCredits = creditRepository.sumCreditsByUserId(user.getId());
+
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("userId", user.getId());
+            resp.put("userName", user.getName());
+            resp.put("totalCredits", totalCredits != null ? totalCredits : 0.0);
+
+            return ResponseEntity.ok(resp);
+        } catch (Exception e) {
+            log.error("Error fetching my total credits: {}", e.getMessage());
+            return ResponseEntity.status(500).build();
+        }
+    }
+
+    /**
+     * GET /api/credits/user/{userId}
+     * Get all credits for a specific user (Admin only)
+     */
+    @GetMapping("/user/{userId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPERADMIN')")
+    public ResponseEntity<List<OSD_CreditDTO>> getUserCredits(@PathVariable Long userId) {
+        try {
+            List<Credit> credits = creditRepository.findByUserId(userId);
+
+            List<OSD_CreditDTO> dtos = credits.stream()
+                    .map(creditService::convertToDTO)
+                    .collect(Collectors.toList());
+
+            return ResponseEntity.ok(dtos);
+        } catch (Exception e) {
+            log.error("Error fetching user credits: {}", e.getMessage());
+            return ResponseEntity.status(500).build();
+        }
+    }
+
+    /**
+     * GET /api/credits/user/{userId}/summary
+     * Get credits summary for a specific user (Admin only)
+     */
+    @GetMapping("/user/{userId}/summary")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPERADMIN')")
+    public ResponseEntity<Map<String, Object>> getUserCreditsSummary(@PathVariable Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            Double totalCredits = creditRepository.sumCreditsByUserId(userId);
+            Double unpaidCredits = creditRepository.sumUnpaidCreditsByUserId(userId);
+            Double paidCredits = creditRepository.sumPaidCreditsByUserId(userId);
+
+            Map<String, Object> summary = new HashMap<>();
+            summary.put("totalCredits", totalCredits != null ? totalCredits : 0.0);
+            summary.put("unpaidCredits", unpaidCredits != null ? unpaidCredits : 0.0);
+            summary.put("paidCredits", paidCredits != null ? paidCredits : 0.0);
+            summary.put("userId", user.getId());
+            summary.put("userName", user.getName());
+            summary.put("userEmail", user.getEmail());
+
+            return ResponseEntity.ok(summary);
+        } catch (Exception e) {
+            log.error("Error fetching user credits summary: {}", e.getMessage());
+            return ResponseEntity.status(500).build();
+        }
+    }
+
+    /**
+     * GET /api/credits/user/{userId}/total
+     * Admin only: Get total credits (all time) for a specific user
+     */
+    @GetMapping("/user/{userId}/total")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPERADMIN')")
+    public ResponseEntity<Map<String, Object>> getUserTotalCredits(@PathVariable Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            Double totalCredits = creditRepository.sumCreditsByUserId(userId);
+
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("userId", user.getId());
+            resp.put("userName", user.getName());
+            resp.put("totalCredits", totalCredits != null ? totalCredits : 0.0);
+
+            return ResponseEntity.ok(resp);
+        } catch (RuntimeException e) {
+            log.error("Error fetching user total credits {}: {}", userId, e.getMessage());
+            return ResponseEntity.status(404).body(null);
+        } catch (Exception e) {
+            log.error("Error fetching user total credits {}: {}", userId, e.getMessage());
+            return ResponseEntity.status(500).build();
         }
     }
 }

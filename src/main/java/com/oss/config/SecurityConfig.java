@@ -22,8 +22,20 @@ public class SecurityConfig {
     @Bean
     public AccessDeniedHandler accessDeniedHandler() {
         return (request, response, accessDeniedException) -> {
-            System.err.println("ACCESS DENIED: " + request.getRequestURI() + " | User: " + request.getRemoteUser());
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access Denied");
+            String username = request.getRemoteUser();
+            String method = request.getMethod();
+            String uri = request.getRequestURI();
+            String auth = request.getHeader("Authorization");
+
+            System.err.println("========== ACCESS DENIED ==========");
+            System.err.println("Method: " + method);
+            System.err.println("URI: " + uri);
+            System.err.println("User: " + username);
+            System.err.println("Has Auth Header: " + (auth != null));
+            System.err.println("Exception: " + accessDeniedException.getMessage());
+            System.err.println("===================================");
+
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access Denied: " + accessDeniedException.getMessage());
         };
     }
     @Bean
