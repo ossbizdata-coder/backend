@@ -10,10 +10,12 @@ import com.oss.service.AttendanceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import java.security.Principal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 @RestController
@@ -171,4 +173,85 @@ public class OSS_AttendanceController {
                     .body(Map.of("error", "Error updating adjustments: " + e.getMessage()));
         }
     }
+
+    /**
+     * NEW: SUPERADMIN-only endpoint to update attendance status using userId + workDate
+     * PUT /api/attendance/update-status
+     */
+    @PutMapping("/update-status")
+    @PreAuthorize("hasRole('SUPERADMIN')")
+    public ResponseEntity<?> updateStatusByUserAndDate(@RequestBody Map<String, Object> body) {
+        try {
+            // Validate input
+            if (body.get("userId") == null || body.get("workDate") == null || body.get("status") == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "userId, workDate and status are required"));
+            }
+            Long userId = Long.valueOf(body.get("userId").toString());
+            LocalDate workDate = LocalDate.parse(body.get("workDate").toString());
+            String statusStr = body.get("status").toString();
+            // Find attendance by userId + workDate
+            Attendance attendance = attendanceRepository.findByUserIdAndWorkDate(userId, workDate)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Attendance record not found"));
+            // Validate status
+            com.oss.model.AttendanceStatus status;
+            try {
+                status = com.oss.model.AttendanceStatus.valueOf(statusStr.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid status value"));
+            }
+            // Update fields
+            attendance.setStatus(status);
+            attendance.setIsWorking(status != com.oss.model.AttendanceStatus.NOT_WORKING);
+            Attendance saved = attendanceRepository.save(attendance);
+            return ResponseEntity.ok(Map.of("message", "Status updated successfully"));
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to update status: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * NEW: SUPERADMIN-only endpoint to update attendance adjustments using userId + workDate
+     * PUT /api/attendance/update-adjustments
+     */
+    @PutMapping("/update-adjustments")
+    @PreAuthorize("hasRole('SUPERADMIN')")
+    public ResponseEntity<?> updateAdjustmentsByUserAndDate(@RequestBody Map<String, Object> body) {
+        try {
+            if (body.get("userId") == null || body.get("workDate") == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "userId and workDate are required"));
+            }
+            Long userId = Long.valueOf(body.get("userId").toString());
+            LocalDate workDate = LocalDate.parse(body.get("workDate").toString());
+            // Find attendance
+            Attendance attendance = attendanceRepository.findByUserIdAndWorkDate(userId, workDate)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Attendance record not found"));
+            // Parse optional fields
+            Double overtimeHours = body.containsKey("overtimeHours") && body.get("overtimeHours") != null
+                    ? Double.valueOf(body.get("overtimeHours").toString())
+                    : 0.0;
+            Double deductionHours = body.containsKey("deductionHours") && body.get("deductionHours") != null
+                    ? Double.valueOf(body.get("deductionHours").toString())
+                    : 0.0;
+            String overtimeReason = body.containsKey("overtimeReason") ? (String) body.get("overtimeReason") : null;
+            String deductionReason = body.containsKey("deductionReason") ? (String) body.get("deductionReason") : null;
+            if (overtimeHours < 0 || deductionHours < 0) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Overtime and deduction hours must be non-negative"));
+            }
+            attendance.setOvertimeHours(overtimeHours);
+            attendance.setDeductionHours(deductionHours);
+            attendance.setOvertimeReason(overtimeReason);
+            attendance.setDeductionReason(deductionReason);
+            attendanceRepository.save(attendance);
+            return ResponseEntity.ok(Map.of("message", "Adjustments updated successfully"));
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error updating adjustments: " + e.getMessage()));
+        }
+    }
 }
+

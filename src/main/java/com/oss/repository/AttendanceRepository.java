@@ -23,6 +23,9 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
             @Param("workDate") LocalDate workDate
                                                     );
 
+    // New convenience method: find by userId and workDate directly
+    Optional<Attendance> findByUserIdAndWorkDate(Long userId, LocalDate workDate);
+
     List<Attendance> findByUserOrderByWorkDateDesc(User user);
 
     List<Attendance> findByUserAndWorkDateBetween(

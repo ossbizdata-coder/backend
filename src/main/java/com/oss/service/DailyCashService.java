@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.oss.repository.UserRepository;
 @Service
 public class DailyCashService {
     private static final Logger log = LoggerFactory.getLogger(DailyCashService.class);
@@ -26,13 +28,15 @@ public class DailyCashService {
     private final ExpenseTypeRepository expenseTypeRepo;
     private final AuditLogService auditLogService;
     private final DailySummaryService dailySummaryService;
+    private final UserRepository userRepository;
     public DailyCashService(DailyCashRepository dailyCashRepo,
                            ShopRepository shopRepo,
                            CashTransactionRepository cashTransactionRepo,
                            CreditRepository creditRepo,
                            ExpenseTypeRepository expenseTypeRepo,
                            AuditLogService auditLogService,
-                           DailySummaryService dailySummaryService) {
+                           DailySummaryService dailySummaryService,
+                           UserRepository userRepository) {
         this.dailyCashRepo = dailyCashRepo;
         this.shopRepo = shopRepo;
         this.cashTransactionRepo = cashTransactionRepo;
@@ -40,6 +44,7 @@ public class DailyCashService {
         this.expenseTypeRepo = expenseTypeRepo;
         this.auditLogService = auditLogService;
         this.dailySummaryService = dailySummaryService;
+        this.userRepository = userRepository;
     }
     public List<ShopSummaryDTO> getShopsSummary() {
         return shopRepo.findAll().stream()
@@ -269,16 +274,61 @@ public void closeDay(Long dailyCashId, Double closingCash, User user) {
      */
     @Transactional
     public void updateOpeningBalance(Long dailyCashId, Double openingCash) {
+        // Resolve authenticated user from security context and delegate
+        String username = null;
+        if (SecurityContextHolder.getContext() != null && SecurityContextHolder.getContext().getAuthentication() != null) {
+            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
+                username = ((org.springframework.security.core.userdetails.UserDetails) principal).getUsername();
+            } else if (principal instanceof String) {
+                username = (String) principal;
+            }
+        }
+        if (username == null) {
+            throw new RuntimeException("Unauthenticated request");
+        }
+        User user = userRepository.findByEmail(username)
+                .orElseThrow(() -> new RuntimeException("Invalid user"));
+        updateOpeningBalance(dailyCashId, openingCash, user);
+    }
+
+    @Transactional
+    public void updateOpeningBalance(Long dailyCashId, Double openingCash, User user) {
         DailyCash dailyCash = dailyCashRepo.findById(dailyCashId)
                 .orElseThrow(() -> new RuntimeException("Daily cash not found"));
-        // Removed locked day check - allow updating opening balance even after day is closed
-        // Capture old values for audit
-        java.util.Map<String, Object> oldValues = new java.util.HashMap<>();
-        oldValues.put("openingCash", dailyCash.getOpeningCash());
-        oldValues.put("openingConfirmed", dailyCash.getOpeningConfirmed());
+
+        // Capture old values for audit (only if updating existing confirmed balance)
+        java.util.Map<String, Object> oldValues = null;
+        boolean isFirstTime = !Boolean.TRUE.equals(dailyCash.getOpeningConfirmed());
+
+        if (!isFirstTime && dailyCash.getOpeningCash() != null) {
+            oldValues = new java.util.HashMap<>();
+            oldValues.put("id", dailyCash.getId());
+            oldValues.put("openingCash", dailyCash.getOpeningCash());
+            oldValues.put("openingConfirmed", dailyCash.getOpeningConfirmed());
+        }
+
+        // Update opening balance
         dailyCash.setOpeningCash(openingCash);
-        dailyCash.setOpeningConfirmed(true);  // âš ï¸ NEW: Mark opening balance as confirmed
-        dailyCashRepo.save(dailyCash);
+        dailyCash.setOpeningConfirmed(true);
+        DailyCash saved = dailyCashRepo.save(dailyCash);
+
+        // Prepare new values for audit (include full context per spec)
+        java.util.Map<String, Object> newValues = new java.util.HashMap<>();
+        newValues.put("id", saved.getId());
+        newValues.put("shopId", saved.getShop().getId());
+        newValues.put("businessDate", saved.getBusinessDate().toString());
+        newValues.put("openingCash", saved.getOpeningCash());
+        newValues.put("openingConfirmed", saved.getOpeningConfirmed());
+
+        // Add openedBy nested object
+        java.util.Map<String, Object> openedBy = new java.util.HashMap<>();
+        openedBy.put("id", user.getId());
+        openedBy.put("name", user.getName());
+        newValues.put("openedBy", openedBy);
+
+        // Use "EDIT" action as per specification (not ADD_START/UPDATE_OPENING)
+        auditLogService.createAuditLog(user, "EDIT", "DAILY_CASH", dailyCashId, oldValues, newValues);
     }
     /**
      * Update daily cash record (SUPERADMIN only)
@@ -357,3 +407,4 @@ public void closeDay(Long dailyCashId, Double closingCash, User user) {
         dailySummaryService.calculateAndSaveDailySummary(dailyCash);
     }
 }
+
