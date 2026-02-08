@@ -1,0 +1,312 @@
+SYSTEM STATUS & CONFIGURATION REPORT
+===================================
+
+------------------------------------------------------------
+1. APPLICATION CONFIGURATION
+------------------------------------------------------------
+
+Service Name:
+  oss.service
+
+Service File:
+  /etc/systemd/system/oss.service
+
+Service User:
+  sahan
+
+Working Directory:
+  /var/lib/oss
+
+Start Command:
+  /usr/bin/java -jar /opt/oss/oss-1.0.0.jar
+
+Important Note:
+  Application is now in /var/lib/oss (SAFE, PERSISTENT STORAGE).
+  Database is in /var/lib/oss-data/ (SAFE, PERSISTENT STORAGE).
+  NEVER use /dev/ for application data - it's for device files only!
+
+------------------------------------------------------------
+2. DATABASE CONFIGURATION
+------------------------------------------------------------
+
+Database Type:
+  SQLite
+
+Database File:
+  /var/lib/oss-data/oss.db
+
+Status:
+  Fresh installation with clean schema
+
+Hibernate DDL Mode:
+  update (auto-creates/updates schema)
+
+Initial Data:
+  - 4 shops (Cafe, Bookshop, Foodhut, Common)
+  - Foodhut menu items and variations
+  - Admin user (created via application)
+
+------------------------------------------------------------
+3. SCRIPTS & DOCUMENTATION
+------------------------------------------------------------
+
+Documentation Directory:
+  D:\dev\repository\myproject\backend\docs\
+
+Key Scripts:
+  - FRESH_START_INSTALLATION.md (clean installation guide)
+  - populate_database_now.sh    (add initial data)
+  - complete_restore.sql         (schema creation)
+  - import_my_credits.sql        (manual credit restoration)
+
+Backup Scripts (to be created):
+  - backup-oss-db.sh            (automated daily backup)
+  - off-server-sync.sh          (sync to cloud/remote)
+
+------------------------------------------------------------
+4. ROOT CAUSE OF INCIDENT (RESOLVED)
+------------------------------------------------------------
+
+WHAT HAPPENED:
+- Application and database were mistakenly located on /dev/
+- /dev/ is for DEVICE FILES ONLY (not application data)
+- VPS restart wiped everything:
+    - Application JAR
+    - Database
+    - Uploaded files
+    - Backups stored there
+
+ROOT CAUSE:
+- Fundamental misunderstanding of Linux filesystem
+- /dev/ is NOT persistent storage
+- This was a CRITICAL STORAGE ARCHITECTURE ERROR
+
+LESSON LEARNED:
+- Never use /dev/ for application data
+- Always use proper locations:
+    - /opt/ for applications
+    - /var/lib/ for application data
+    - /var/log/ for logs
+    - Separate partition/server for backups
+
+------------------------------------------------------------
+5. CURRENT FIXES APPLIED
+------------------------------------------------------------
+
+✅ Application moved to:
+    /opt/oss/ (persistent, standard location)
+
+✅ Database moved to:
+    /var/lib/oss-data/ (persistent, standard data location)
+
+✅ Systemd service updated:
+    - WorkingDirectory=/opt/oss
+    - ExecStart=/usr/bin/java -jar /opt/oss/oss-1.0.0.jar
+    - User=sahan
+
+✅ Fresh database installation:
+    - Clean schema (no old data conflicts)
+    - Correct Role enum values (uppercase)
+    - Hibernate auto-creates tables
+
+✅ Scripts ready:
+    - Fresh installation script
+    - Backup scripts
+    - Automated backup setup (cron)
+
+✅ Permissions corrected:
+    - /opt/oss owned by sahan:sahan (755)
+    - /var/lib/oss-data owned by sahan:sahan (755)
+    - Database file: 644 permissions
+
+------------------------------------------------------------
+6. DEPLOYMENT CHECKLIST (For Fresh VPS)
+------------------------------------------------------------
+
+✅ COMPLETED:
+  - Application in /opt/oss
+  - Database in /var/lib/oss-data
+  - Service file configured correctly
+  - Fresh database with clean schema
+
+⚠️ TODO AFTER FRESH START:
+  1. Create admin user (via application)
+  2. Add staff users
+  3. Add expense types
+  4. Configure automated backups (see section 7)
+  5. Test backup/restore process
+  6. Set up off-server backup location
+  7. Document credentials securely
+
+❌ NEVER DO AGAIN:
+  - Store anything in /dev/
+  - Keep backups on same server only
+  - Skip regular backup testing
+
+------------------------------------------------------------
+7. BACKUP STRATEGY (CRITICAL!)
+------------------------------------------------------------
+
+LOCAL BACKUPS (On VPS):
+  Location: /backup/oss/ (DIFFERENT partition if possible)
+
+  Daily automated backup (2 AM):
+    crontab: 0 2 * * * /usr/local/bin/backup-oss-db.sh
+
+  Script backs up to:
+    /backup/oss/oss_YYYYMMDD_HHMMSS.db.gz
+
+  Retention: 7 days local
+
+OFF-SERVER BACKUPS (MANDATORY!):
+  NEVER store backups only on same server!
+
+  Options (choose at least 2):
+    1. Cloud storage:
+       - AWS S3 / Google Cloud Storage / Backblaze B2
+       - Use: rclone, aws-cli, gsutil
+
+    2. Another VPS/server:
+       - Daily rsync/scp to different provider
+
+    3. Local machine:
+       - Daily download via scp/rsync
+
+    4. Git repository (for code + schema only):
+       - NOT for database files
+
+RETENTION POLICY:
+  - Daily: Keep 7 days
+  - Weekly: Keep 4 weeks
+  - Monthly: Keep 3 months
+
+TEST RESTORES:
+  - Monthly: Restore backup to test database
+  - Verify: Data integrity, application startup
+  - Document: Restore procedure
+
+------------------------------------------------------------
+8. MAINTENANCE CHECKLIST
+------------------------------------------------------------
+
+DAILY (Automated):
+  ✓ Backup runs at 2 AM
+  ✓ Off-server sync completes
+
+WEEKLY (Manual - 15 minutes):
+  □ Check disk usage: df -h
+  □ Check backup logs: ls -lh /backup/oss/
+  □ Verify service status: systemctl status oss.service
+  □ Check application logs: journalctl -u oss.service -n 100
+
+MONTHLY (Manual - 30 minutes):
+  □ Test restore from backup
+  □ Verify restored database integrity
+  □ Check off-server backup accessibility
+  □ Review and update documentation
+  □ Check for application updates
+
+QUARTERLY:
+  □ Full disaster recovery test
+  □ Review and update credentials
+  □ Audit user access
+  □ Review backup retention policy
+
+CRITICAL RULES (NEVER FORGET):
+  ❌ NEVER store data in /dev/
+  ❌ NEVER keep backups only on same server
+  ❌ NEVER skip backup verification
+  ❌ NEVER use same password for all services
+  ✅ ALWAYS test restores before you need them
+  ✅ ALWAYS keep backups in multiple locations
+  ✅ ALWAYS document changes
+
+------------------------------------------------------------
+CURRENT SYSTEM STATUS (February 8, 2026)
+------------------------------------------------------------
+
+✅ Application: /opt/oss/oss-1.0.0.jar
+✅ Database: /var/lib/oss-data/oss.db (FRESH, CLEAN)
+✅ Service: Running on port 8080
+✅ Schema: Auto-created by Hibernate
+✅ No corrupted old data
+
+⚠️ FRESH START STATUS:
+   - Database is EMPTY (zero records)
+   - Need to create admin user
+   - Need to add initial data via application
+   - Ready for production use
+
+📋 IMMEDIATE NEXT STEPS:
+   1. Access application: http://your-server:8080
+   2. Create admin user via registration
+   3. Add shops, menu items through UI
+   4. Set up automated backups
+   5. Configure off-server backup destination
+
+------------------------------------------------------------
+LESSONS LEARNED FROM DISASTER
+------------------------------------------------------------
+
+1. Linux /dev/ is for DEVICE FILES, not application data
+2. Backups on same server = NO BACKUP
+3. Test restore procedure BEFORE disaster strikes
+4. Document everything - memory fades, docs don't
+5. Proper storage locations matter:
+   - Applications: /opt/
+   - Application data: /var/lib/
+   - Logs: /var/log/
+   - Temporary files: /tmp/
+   - NEVER: /dev/
+
+------------------------------------------------------------
+DOCUMENT MAINTENANCE
+------------------------------------------------------------
+
+This document should be:
+  ✓ Kept with server credentials
+  ✓ Updated when configuration changes
+  ✓ Reviewed monthly
+  ✓ Backed up off-server
+
+Last Updated: February 8, 2026
+Next Review: March 8, 2026
+
+------------------------------------------------------------
+SUPPORT & REFERENCES
+------------------------------------------------------------
+
+Documentation Location:
+  D:\dev\repository\myproject\backend\docs\
+
+Key Documents:
+  ⚠️ SCHEMA_ISSUES_ANALYSIS.md (READ FIRST! - Current problems)
+  - FRESH_START_INSTALLATION.md
+  - CRITICAL_WARNING_DATABASE_LOCATION.md
+  - DATABASE_RESTORATION_GUIDE.md
+
+Service Commands:
+  sudo systemctl status oss.service
+  sudo systemctl start oss.service
+  sudo systemctl stop oss.service
+  sudo systemctl restart oss.service
+  sudo journalctl -u oss.service -f
+
+Database Access:
+  sqlite3 /var/lib/oss-data/oss.db
+
+Schema Verification Commands:
+  # View all tables
+  sqlite3 /var/lib/oss-data/oss.db ".tables"
+
+  # View full schema
+  sqlite3 /var/lib/oss-data/oss.db ".schema"
+
+  # Check for duplicate tables
+  sqlite3 /var/lib/oss-data/oss.db ".tables" | grep -E "(idea|improvement)"
+
+  # Count tables (should be 16, not 20)
+  sqlite3 /var/lib/oss-data/oss.db ".tables" | wc -w
+
+END OF REPORT
+============================================================
