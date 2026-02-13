@@ -84,7 +84,7 @@ public class OSD_CreditController {
      * Delete a credit record (SUPERADMIN only)
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAuthority('SUPERADMIN')")
     public ResponseEntity<?> deleteCredit(@PathVariable Long id, Principal principal) {
         try {
             User user = userRepository.findByEmail(principal.getName())
@@ -101,7 +101,7 @@ public class OSD_CreditController {
      * Edit a credit record (SUPERADMIN only)
      */
     @PutMapping("/{id}/edit")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAuthority('SUPERADMIN')")
     public ResponseEntity<?> editCredit(@PathVariable Long id, @RequestBody Map<String, Object> body, Principal principal) {
         try {
             User user = userRepository.findByEmail(principal.getName())
@@ -196,7 +196,7 @@ public class OSD_CreditController {
      * Get all credits for a specific user (Admin only)
      */
     @GetMapping("/user/{userId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPERADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'SUPERADMIN')")
     public ResponseEntity<List<OSD_CreditDTO>> getUserCredits(@PathVariable Long userId) {
         try {
             List<Credit> credits = creditRepository.findByUserId(userId);
@@ -217,7 +217,7 @@ public class OSD_CreditController {
      * Get credits summary for a specific user (Admin only)
      */
     @GetMapping("/user/{userId}/summary")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPERADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'SUPERADMIN')")
     public ResponseEntity<Map<String, Object>> getUserCreditsSummary(@PathVariable Long userId) {
         try {
             User user = userRepository.findById(userId)
@@ -247,7 +247,7 @@ public class OSD_CreditController {
      * Admin only: Get total credits (all time) for a specific user
      */
     @GetMapping("/user/{userId}/total")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPERADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'SUPERADMIN')")
     public ResponseEntity<Map<String, Object>> getUserTotalCredits(@PathVariable Long userId) {
         try {
             User user = userRepository.findById(userId)
@@ -261,11 +261,8 @@ public class OSD_CreditController {
             resp.put("totalCredits", totalCredits != null ? totalCredits : 0.0);
 
             return ResponseEntity.ok(resp);
-        } catch (RuntimeException e) {
-            log.error("Error fetching user total credits {}: {}", userId, e.getMessage());
-            return ResponseEntity.status(404).body(null);
         } catch (Exception e) {
-            log.error("Error fetching user total credits {}: {}", userId, e.getMessage());
+            log.error("Error fetching user total credits: {}", e.getMessage());
             return ResponseEntity.status(500).build();
         }
     }

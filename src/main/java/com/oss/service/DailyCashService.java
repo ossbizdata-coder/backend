@@ -406,5 +406,20 @@ public void closeDay(Long dailyCashId, Double closingCash, User user) {
         }
         dailySummaryService.calculateAndSaveDailySummary(dailyCash);
     }
+
+    /**
+     * Recalculate ALL daily summaries for closed days (SUPERADMIN only)
+     * Use after fixing calculation bugs
+     */
+    @Transactional
+    public int recalculateAllSummaries() {
+        List<DailyCash> closedDays = dailyCashRepo.findAll().stream()
+                .filter(DailyCash::getLocked)
+                .collect(java.util.stream.Collectors.toList());
+        for (DailyCash dailyCash : closedDays) {
+            dailySummaryService.calculateAndSaveDailySummary(dailyCash);
+        }
+        return closedDays.size();
+    }
 }
 

@@ -34,7 +34,7 @@ public class Admin_TransactionController {
      * }
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAuthority('SUPERADMIN')")
     public ResponseEntity<?> updateTransaction(
             @PathVariable Long id,
             @RequestBody Map<String, Object> updates,
@@ -66,7 +66,7 @@ public class Admin_TransactionController {
      * Daily summary will be recalculated automatically
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAuthority('SUPERADMIN')")
     public ResponseEntity<?> deleteTransaction(
             @PathVariable Long id,
             Principal principal) {
@@ -89,7 +89,7 @@ public class Admin_TransactionController {
      * Get transaction details for editing (SUPERADMIN only)
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAuthority('SUPERADMIN')")
     public ResponseEntity<?> getTransaction(@PathVariable Long id) {
         try {
             return ResponseEntity.ok(transactionService.getTransactionDetails(id));

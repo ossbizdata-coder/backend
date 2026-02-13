@@ -179,7 +179,7 @@ public class OSS_AttendanceController {
      * PUT /api/attendance/update-status
      */
     @PutMapping("/update-status")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAuthority('SUPERADMIN')")
     public ResponseEntity<?> updateStatusByUserAndDate(@RequestBody Map<String, Object> body) {
         try {
             // Validate input
@@ -217,7 +217,7 @@ public class OSS_AttendanceController {
      * PUT /api/attendance/update-adjustments
      */
     @PutMapping("/update-adjustments")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAuthority('SUPERADMIN')")
     public ResponseEntity<?> updateAdjustmentsByUserAndDate(@RequestBody Map<String, Object> body) {
         try {
             if (body.get("userId") == null || body.get("workDate") == null) {
@@ -254,4 +254,3 @@ public class OSS_AttendanceController {
         }
     }
 }
-

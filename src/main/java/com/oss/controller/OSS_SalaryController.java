@@ -24,7 +24,7 @@ public class OSS_SalaryController {
     // ADMIN: MONTHLY STAFF SALARY
     // ======================
     @GetMapping("/admin/monthly")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAuthority('SUPERADMIN')")
     public List<StaffSalaryReport> monthlyStaffSalary(
             @RequestParam int year,
             @RequestParam int month
@@ -45,7 +45,7 @@ public class OSS_SalaryController {
     // USER MONTHLY SALARY (FOR ADMIN)
     // ======================
     @GetMapping("/user/{userId}/monthly")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAuthority('SUPERADMIN')")
     public Map<String, Object> getUserMonthlySalary(
             @PathVariable Long userId,
             @RequestParam int year,

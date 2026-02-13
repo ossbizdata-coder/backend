@@ -47,13 +47,19 @@ public class DailySummaryService {
         Double closingCash = dailyCash.getClosingCash();
         Double cashDifference = closingCash != null ? closingCash - openingCash : 0.0;
         // Get expenses for this day
-        List<CashTransaction> expenses = cashTransactionRepo.findExpensesByDate(businessDate);
-        List<CashTransaction> shopExpenses = expenses.stream()
-                .filter(ct -> ct.getDailyCash().getShop().getId().equals(shop.getId()))
+        List<CashTransaction> allTransactions = cashTransactionRepo.findByDailyCashId(dailyCash.getId());
+        List<CashTransaction> shopExpenses = allTransactions.stream()
+                .filter(ct -> "EXPENSE".equals(ct.getType()))
                 .collect(Collectors.toList());
         Double totalExpenses = shopExpenses.stream()
                 .mapToDouble(CashTransaction::getAmount)
                 .sum();
+
+        // Get manual sales count for this daily_cash
+        List<CashTransaction> shopSales = allTransactions.stream()
+                .filter(ct -> "SALE".equals(ct.getType()))
+                .collect(Collectors.toList());
+        int manualSaleCount = shopSales.size();
         // Get credits for this day using shop parameter
         List<Credit> credits = creditRepo.findByShopAndTransactionDate(shop, businessDate);
         Double totalCredits = credits.stream()
@@ -76,8 +82,6 @@ public class DailySummaryService {
                 .filter(a -> a.getIsWorking() != null && a.getIsWorking())
                 .mapToDouble(a -> 8.0) // Standard 8-hour workday
                 .sum();
-        // Get manual sales count - DailyCash doesn't have manualSales collection, default to 0
-        int manualSaleCount = 0;
         // Build and save summary
         DailySummary summary = DailySummary.builder()
                 .shop(shop)
@@ -115,13 +119,22 @@ public class DailySummaryService {
         Double openingCash = dailyCash.getOpeningCash();
         Double closingCash = dailyCash.getClosingCash();
         Double cashDifference = closingCash != null ? closingCash - openingCash : 0.0;
-        List<CashTransaction> expenses = cashTransactionRepo.findExpensesByDate(businessDate);
-        List<CashTransaction> shopExpenses = expenses.stream()
-                .filter(ct -> ct.getDailyCash().getShop().getId().equals(shop.getId()))
+
+        // Get all transactions for this daily_cash
+        List<CashTransaction> allTransactions = cashTransactionRepo.findByDailyCashId(dailyCash.getId());
+        List<CashTransaction> shopExpenses = allTransactions.stream()
+                .filter(ct -> "EXPENSE".equals(ct.getType()))
                 .collect(Collectors.toList());
         Double totalExpenses = shopExpenses.stream()
                 .mapToDouble(CashTransaction::getAmount)
                 .sum();
+
+        // Get manual sales count for this daily_cash
+        List<CashTransaction> shopSales = allTransactions.stream()
+                .filter(ct -> "SALE".equals(ct.getType()))
+                .collect(Collectors.toList());
+        int manualSaleCount = shopSales.size();
+
         List<Credit> credits = creditRepo.findByShopAndTransactionDate(shop, businessDate);
         Double totalCredits = credits.stream()
                 .mapToDouble(Credit::getAmount)
@@ -139,7 +152,6 @@ public class DailySummaryService {
                 .filter(a -> a.getIsWorking() != null && a.getIsWorking())
                 .mapToDouble(a -> 8.0) // Standard 8-hour workday
                 .sum();
-        int manualSaleCount = 0;
         // Update existing summary
         existing.setOpeningCash(openingCash);
         existing.setClosingCash(closingCash);

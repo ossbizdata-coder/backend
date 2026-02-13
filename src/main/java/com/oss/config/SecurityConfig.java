@@ -15,7 +15,10 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+
 @Configuration
+@EnableMethodSecurity
 public class SecurityConfig {
     @Autowired
     private JwtAuthFilter jwtAuthFilter;
@@ -52,7 +55,7 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/api/items", "/api/items/**", "/items", "/items/**").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/items", "/api/items/**", "/items", "/items/**").permitAll()
                     // All other /api/** endpoints - accessible by STAFF, ADMIN, SUPERADMIN
-                    .requestMatchers("/api/**").hasAnyRole("STAFF", "ADMIN", "SUPERADMIN")
+                    .requestMatchers("/api/**").hasAnyAuthority("STAFF", "ADMIN", "SUPERADMIN")
                     // Default - require authentication
                     .anyRequest().authenticated()
                 )

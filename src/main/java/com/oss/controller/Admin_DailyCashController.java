@@ -31,7 +31,7 @@ public class Admin_DailyCashController {
      * Can update opening cash, closing cash, etc.
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAuthority('SUPERADMIN')")
     public ResponseEntity<?> updateDailyCash(
             @PathVariable Long id,
             @RequestBody Map<String, Object> updates,
@@ -56,7 +56,7 @@ public class Admin_DailyCashController {
      * WARNING: This will cascade delete all transactions for that day!
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAuthority('SUPERADMIN')")
     public ResponseEntity<?> deleteDailyCash(
             @PathVariable Long id,
             Principal principal) {
@@ -80,7 +80,7 @@ public class Admin_DailyCashController {
      * Useful if summary gets out of sync
      */
     @PostMapping("/{id}/recalculate-summary")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAuthority('SUPERADMIN')")
     public ResponseEntity<?> recalculateSummary(@PathVariable Long id) {
         try {
             dailyCashService.recalculateSummaryForDay(id);
@@ -90,6 +90,25 @@ public class Admin_DailyCashController {
             ));
         } catch (RuntimeException e) {
             return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", "Internal server error: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * POST /api/admin/daily-cash/recalculate-all
+     * Recalculate ALL daily summaries (SUPERADMIN only)
+     * Use this after fixing calculation bugs
+     */
+    @PostMapping("/recalculate-all")
+    @PreAuthorize("hasAuthority('SUPERADMIN')")
+    public ResponseEntity<?> recalculateAllSummaries() {
+        try {
+            int count = dailyCashService.recalculateAllSummaries();
+            return ResponseEntity.ok(Map.of(
+                "message", "All daily summaries recalculated successfully",
+                "count", count
+            ));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", "Internal server error: " + e.getMessage()));
         }

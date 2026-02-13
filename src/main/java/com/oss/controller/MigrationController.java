@@ -93,7 +93,7 @@ public class MigrationController {
      * After running this, Business Overview and Staff Performance will be 10-100x faster!
      */
     @PostMapping("/backfill-summaries")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAuthority('SUPERADMIN')")
     public ResponseEntity<?> backfillDailySummaries(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
@@ -118,7 +118,7 @@ public class MigrationController {
      * Adjust the date range in code if you need different period.
      */
     @PostMapping("/backfill-summaries-all")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAuthority('SUPERADMIN')")
     public ResponseEntity<?> backfillAllDailySummaries() {
         try {
             // Calculate from earliest to latest (approximately 3 months ago to today)

@@ -18,7 +18,7 @@ public class AuditLogController {
      * Get all audit logs (SUPERADMIN only)
      */
     @GetMapping
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAuthority('SUPERADMIN')")
     public ResponseEntity<List<Map<String, Object>>> getAllAuditLogs() {
         return ResponseEntity.ok(auditLogService.getAllAuditLogs());
     }
@@ -27,7 +27,7 @@ public class AuditLogController {
      * Get audit logs for a specific entity (e.g., DAILY_CASH/123)
      */
     @GetMapping("/entity/{entityType}/{entityId}")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAuthority('SUPERADMIN')")
     public ResponseEntity<List<Map<String, Object>>> getAuditLogsByEntity(
             @PathVariable String entityType,
             @PathVariable Long entityId) {
@@ -38,7 +38,7 @@ public class AuditLogController {
      * Get audit logs for a specific user's actions
      */
     @GetMapping("/user/{userId}")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAuthority('SUPERADMIN')")
     public ResponseEntity<List<Map<String, Object>>> getAuditLogsByUser(@PathVariable Long userId) {
         return ResponseEntity.ok(auditLogService.getAuditLogsByUser(userId));
     }
@@ -47,7 +47,7 @@ public class AuditLogController {
      * Filter audit logs by entity type or action
      */
     @GetMapping("/filter")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAuthority('SUPERADMIN')")
     public ResponseEntity<List<Map<String, Object>>> filterAuditLogs(
             @RequestParam(required = false) String entityType,
             @RequestParam(required = false) String action) {

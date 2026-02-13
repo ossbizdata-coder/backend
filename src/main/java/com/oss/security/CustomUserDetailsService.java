@@ -17,9 +17,9 @@ public class CustomUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
-        // âœ… FIX: Return user's role as authority with ROLE_ prefix
+        // Return user's role as authority (no ROLE_ prefix - matches JWT)
         List<SimpleGrantedAuthority> authorities = Collections.singletonList(
-            new SimpleGrantedAuthority("ROLE_" + user.getRole())
+            new SimpleGrantedAuthority(user.getRole().name())
         );
         return new org.springframework.security.core.userdetails.User(
                 user.getEmail(),
