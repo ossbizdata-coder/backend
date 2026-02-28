@@ -65,12 +65,10 @@ public class AttendanceService {
         Attendance attendance;
         if (existingOpt.isPresent()) {
             attendance = existingOpt.get();
-            System.out.println("✅ checkIn: Updating EXISTING record ID: " + attendance.getId());
         } else {
             attendance = new Attendance();
             attendance.setUser(user);
             attendance.setWorkDate(today);
-            System.out.println("✅ checkIn: Creating NEW record for: " + today);
         }
 
         // Simple logic: User clicked YES
@@ -100,12 +98,10 @@ public class AttendanceService {
         Attendance attendance;
         if (existingOpt.isPresent()) {
             attendance = existingOpt.get();
-            System.out.println("✅ checkOut: Updating EXISTING record ID: " + attendance.getId());
         } else {
             attendance = new Attendance();
             attendance.setUser(user);
             attendance.setWorkDate(today);
-            System.out.println("✅ checkOut: Creating NEW record for: " + today);
         }
 
         // Update to NOT_WORKING status
@@ -138,15 +134,11 @@ public class AttendanceService {
 
         Attendance attendance;
         if (existingOpt.isPresent()) {
-            // ✅ CRITICAL: Use existing record to ensure UPDATE not INSERT
             attendance = existingOpt.get();
-            System.out.println("✅ Updating EXISTING record ID: " + attendance.getId() + " for date: " + today);
         } else {
-            // Create new record only if none exists
             attendance = new Attendance();
             attendance.setUser(user);
             attendance.setWorkDate(today);
-            System.out.println("✅ Creating NEW record for date: " + today);
         }
 
         // Update status
@@ -154,7 +146,6 @@ public class AttendanceService {
         attendance.setIsWorking(status != AttendanceStatus.NOT_WORKING);
 
         Attendance saved = attendanceRepository.save(attendance);
-        System.out.println("✅ Saved record ID: " + saved.getId() + " with status: " + saved.getStatus());
 
         return saved;
     }

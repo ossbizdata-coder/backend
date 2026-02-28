@@ -9,12 +9,17 @@ import com.oss.repository.AuditLogRepository;
 import com.oss.repository.ExpenseTypeRepository;
 import com.oss.repository.TransactionRepository;
 import jakarta.transaction.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+
 @Service
 public class OSD_TransactionService {
+    private static final Logger log = LoggerFactory.getLogger(OSD_TransactionService.class);
+
     private final TransactionRepository transactionRepo;
     private final ExpenseTypeRepository typeRepo;
     private final AuditLogRepository auditLogRepo;
@@ -149,7 +154,7 @@ public class OSD_TransactionService {
                     .build();
             auditLogRepo.save(auditLog);
         } catch (JsonProcessingException e) {
-            System.err.println("Failed to create audit log: " + e.getMessage());
+            log.error("Failed to create audit log: {}", e.getMessage(), e);
             // Don't fail the transaction if audit logging fails
         }
     }

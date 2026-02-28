@@ -52,6 +52,35 @@ public class Foodhut_TransactionService {
         return saleRepo.save(sale);
     }
     // ================================
+    // UPDATE SALE
+    // ================================
+    public FoodhutSale updateSale(Long saleId, int preparedQty, int remainingQty, SaleActionType actionType) {
+        if (preparedQty < 0 || remainingQty < 0) {
+            throw new IllegalArgumentException("Quantities must be non-negative");
+        }
+
+        FoodhutSale sale = saleRepo.findById(saleId)
+                .orElseThrow(() -> new RuntimeException("Sale not found with id: " + saleId));
+
+        // Update based on action type
+        if (actionType == SaleActionType.PREPARED) {
+            sale.setPreparedQty(preparedQty);
+        } else if (actionType == SaleActionType.REMAINING) {
+            sale.setRemainingQty(remainingQty);
+        }
+
+        return saleRepo.save(sale);
+    }
+
+    // ================================
+    // DELETE SALE
+    // ================================
+    public void deleteSale(Long saleId) {
+        FoodhutSale sale = saleRepo.findById(saleId)
+                .orElseThrow(() -> new RuntimeException("Sale not found with id: " + saleId));
+        saleRepo.delete(sale);
+    }
+    // ================================
     // DAY SUMMARY
     // ================================
     public Foodhut_DaySummaryResponse getSummaryForDay(LocalDate date) {

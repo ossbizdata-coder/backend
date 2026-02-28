@@ -4,12 +4,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oss.model.AuditLog;
 import com.oss.model.User;
 import com.oss.repository.AuditLogRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
+
 @Service
 public class AuditLogService {
+    private static final Logger log = LoggerFactory.getLogger(AuditLogService.class);
+
     private final AuditLogRepository auditLogRepo;
     private final ObjectMapper objectMapper;
     public AuditLogService(AuditLogRepository auditLogRepo) {
@@ -35,13 +40,12 @@ public class AuditLogService {
                     .build();
             auditLogRepo.save(auditLog);
         } catch (JsonProcessingException e) {
-            System.err.println("Failed to create audit log: " + e.getMessage());
+            log.error("Failed to create audit log: {}", e.getMessage(), e);
             // Don't fail the transaction if audit logging fails
         }
     }
     public List<Map<String, Object>> getAllAuditLogs() {
-        return auditLogRepo.findAll().stream()
-                .sorted(Comparator.comparing(AuditLog::getCreatedAt).reversed())
+        return auditLogRepo.findAllOrderByCreatedAtDesc().stream()
                 .map(this::convertToMap)
                 .collect(Collectors.toList());
     }
@@ -59,10 +63,7 @@ public class AuditLogService {
      * Filter audit logs
      */
     public List<Map<String, Object>> filterAuditLogs(String entityType, String action) {
-        return auditLogRepo.findAll().stream()
-                .filter(log -> entityType == null || log.getEntityType().equals(entityType))
-                .filter(log -> action == null || log.getAction().equals(action))
-                .sorted(Comparator.comparing(AuditLog::getCreatedAt).reversed())
+        return auditLogRepo.findByEntityTypeAndAction(entityType, action).stream()
                 .map(this::convertToMap)
                 .collect(Collectors.toList());
     }

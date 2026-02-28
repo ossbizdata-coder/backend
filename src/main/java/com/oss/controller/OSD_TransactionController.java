@@ -69,24 +69,7 @@ public class OSD_TransactionController {
         }
         // Convert to UTC midnight epoch milliseconds for SINGLE DAY
         Long dateMillis = targetDate.atStartOfDay(ZoneId.of("UTC")).toInstant().toEpochMilli();
-        System.out.println("=== DEBUG: /api/transactions/daily ===");
-        System.out.println("Target Date: " + targetDate);
-        System.out.println("Date epoch (UTC): " + dateMillis);
-        System.out.println("Department filter: " + department);
-        System.out.println("Category filter: " + category);
-        // DEBUG: Check what values exist in database
-        List<Transaction> allTransactions = transactionRepo.findAll();
-        System.out.println("Total transactions in database: " + allTransactions.size());
-        if (!allTransactions.isEmpty()) {
-            System.out.println("Sample business_date values from DB:");
-            allTransactions.stream().limit(5).forEach(t -> {
-                System.out.println("  ID: " + t.getId() +
-                    ", business_date: " + t.getBusinessDate() +
-                    " (as date: " + (t.getBusinessDate() != null ?
-                        java.time.Instant.ofEpochMilli(t.getBusinessDate()).atZone(ZoneId.of("UTC")).toLocalDate() : "null") + ")" +
-                    ", dept: " + t.getDepartment());
-            });
-        }
+
         List<Transaction> transactions;
         // Query database for specific date
         if (department != null && !department.isEmpty()) {
@@ -94,16 +77,14 @@ public class OSD_TransactionController {
         } else {
             transactions = transactionRepo.findByBusinessDate(dateMillis);
         }
-        System.out.println("Found " + transactions.size() + " transactions for date " + dateMillis);
+
         // Apply category filter if specified
         if (category != null && !category.isEmpty()) {
             transactions = transactions.stream()
                     .filter(t -> category.equals(t.getCategory()))
                     .collect(Collectors.toList());
-            System.out.println("After category filter: " + transactions.size());
         }
-        System.out.println("Total transactions to return: " + transactions.size());
-        System.out.println("=====================================");
+
         // Convert to DTO to flatten expense type fields and set permissions
         return transactions.stream()
                 .map(t -> {
@@ -126,17 +107,11 @@ public class OSD_TransactionController {
             currentUser = userRepository.findByEmail(principal.getName()).orElse(null);
         }
         boolean isSuperAdmin = currentUser != null && currentUser.getRole() == Role.SUPERADMIN;
-        System.out.println("=== DEBUG: /api/transactions/by-date ===");
-        System.out.println("Date parameter: " + date);
-        System.out.println("Department filter: " + department);
-        System.out.println("Category filter: " + category);
         try {
             // Parse date string (format: YYYY-MM-DD)
             LocalDate targetDate = LocalDate.parse(date);
             // Convert to UTC midnight epoch milliseconds
             Long dateMillis = targetDate.atStartOfDay(ZoneId.of("UTC")).toInstant().toEpochMilli();
-            System.out.println("Parsed date: " + targetDate);
-            System.out.println("Date epoch (UTC): " + dateMillis);
             List<Transaction> transactions;
             // Query based on filters
             if (department != null && !department.isEmpty() && category != null && !category.isEmpty()) {
@@ -148,8 +123,6 @@ public class OSD_TransactionController {
             } else {
                 transactions = transactionRepo.findByBusinessDate(dateMillis);
             }
-            System.out.println("Found " + transactions.size() + " transactions");
-            System.out.println("=====================================");
             // Convert to DTO and set permissions
             List<OSD_TransactionResponse> response = transactions.stream()
                     .map(t -> {
@@ -161,7 +134,6 @@ public class OSD_TransactionController {
                     .collect(Collectors.toList());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            System.err.println("Error parsing date or fetching transactions: " + e.getMessage());
             return ResponseEntity.badRequest().build();
         }
     }
@@ -315,46 +287,7 @@ public class OSD_TransactionController {
         summary.put("salesEntries", salesDTOs);
         return ResponseEntity.ok(summary);
     }
-    @GetMapping("/transactions/debug-dates")
-    public ResponseEntity<?> debugDates() {
-        Map<String, Object> debug = new HashMap<>();
-        // Show server timezone info
-        debug.put("serverDefaultZone", ZoneId.systemDefault().getId());
-        debug.put("serverCurrentTime", Instant.now().toString());
-        // Show what UTC today is
-        LocalDate utcToday = LocalDate.now(ZoneId.of("UTC"));
-        Long utcTodayMillis = utcToday.atStartOfDay(ZoneId.of("UTC")).toInstant().toEpochMilli();
-        debug.put("utcToday", utcToday.toString());
-        debug.put("utcTodayEpoch", utcTodayMillis);
-        // Show what Asia/Colombo today is
-        LocalDate colomboToday = LocalDate.now(ZoneId.of("Asia/Colombo"));
-        Long colomboTodayMillis = colomboToday.atStartOfDay(ZoneId.of("UTC")).toInstant().toEpochMilli();
-        debug.put("colomboToday", colomboToday.toString());
-        debug.put("colomboTodayEpoch", colomboTodayMillis);
-        // Show all unique business_date values in database
-        List<Long> uniqueDates = transactionRepo.findAll().stream()
-            .map(Transaction::getBusinessDate)
-            .distinct()
-            .sorted()
-            .collect(Collectors.toList());
-        List<Map<String, Object>> dateInfo = new java.util.ArrayList<>();
-        for (Long dateMillis : uniqueDates) {
-            if (dateMillis != null) {
-                Map<String, Object> info = new HashMap<>();
-                info.put("epochMillis", dateMillis);
-                info.put("asUTCDate", Instant.ofEpochMilli(dateMillis).atZone(ZoneId.of("UTC")).toLocalDate().toString());
-                info.put("asColomboDate", Instant.ofEpochMilli(dateMillis).atZone(ZoneId.of("Asia/Colombo")).toLocalDate().toString());
-                // Count transactions with this date
-                long count = transactionRepo.findAll().stream()
-                    .filter(t -> dateMillis.equals(t.getBusinessDate()))
-                    .count();
-                info.put("transactionCount", count);
-                dateInfo.add(info);
-            }
-        }
-        debug.put("uniqueBusinessDatesInDB", dateInfo);
-        return ResponseEntity.ok(debug);
-    }
+
     /**
      * UPDATE TRANSACTION - SUPERADMIN ONLY
      * PUT /api/transactions/{id}
@@ -364,28 +297,23 @@ public class OSD_TransactionController {
             @PathVariable Long id,
             @RequestBody OSD_TransactionUpdateRequest request,
             Principal principal) {
-        // Get current user
         Optional<User> optUser = userRepository.findByEmail(principal.getName());
         if (optUser.isEmpty()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid user");
         }
         User user = optUser.get();
-        // Check if user is SUPERADMIN
         if (user.getRole() != Role.SUPERADMIN) {
-            System.err.println("ACCESS DENIED: User " + user.getEmail() + " attempted to edit transaction " + id);
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body("Only SUPERADMIN can edit transactions");
         }
         try {
             Transaction updated = OSDTransactionService.updateTransaction(id, request, user);
-            OSD_TransactionResponse response = OSD_TransactionResponse.from(updated);
-            System.out.println("Transaction " + id + " updated by SUPERADMIN: " + user.getEmail());
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(OSD_TransactionResponse.from(updated));
         } catch (RuntimeException e) {
-            System.err.println("Error updating transaction: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
+
     /**
      * DELETE TRANSACTION - SUPERADMIN ONLY
      * DELETE /api/transactions/{id}
@@ -394,27 +322,22 @@ public class OSD_TransactionController {
     public ResponseEntity<?> deleteTransaction(
             @PathVariable Long id,
             Principal principal) {
-        // Get current user
         Optional<User> optUser = userRepository.findByEmail(principal.getName());
         if (optUser.isEmpty()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid user");
         }
         User user = optUser.get();
-        // Check if user is SUPERADMIN
         if (user.getRole() != Role.SUPERADMIN) {
-            System.err.println("ACCESS DENIED: User " + user.getEmail() + " attempted to delete transaction " + id);
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body("Only SUPERADMIN can delete transactions");
         }
         try {
             OSDTransactionService.deleteTransaction(id, user);
-            System.out.println("Transaction " + id + " deleted by SUPERADMIN: " + user.getEmail());
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Transaction deleted successfully");
             response.put("id", id);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
-            System.err.println("Error deleting transaction: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }

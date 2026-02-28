@@ -37,6 +37,26 @@ public class Foodhut_SaleController {
                            );
         return ResponseEntity.ok().build();
     }
+
+    @PutMapping("/{saleId}")
+    public ResponseEntity<Void> updateSale(
+            @PathVariable Long saleId,
+            @RequestBody Foodhut_TransactionRequest req) {
+        saleService.updateSale(
+                saleId,
+                req.getPreparedQty(),
+                req.getRemainingQty(),
+                req.getActionType()
+        );
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/{saleId}")
+    public ResponseEntity<Void> deleteSale(@PathVariable Long saleId) {
+        saleService.deleteSale(saleId);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/day")
     public List<Foodhut_TransactionResponse> getSalesForDay(
             @RequestParam(required = false)

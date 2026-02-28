@@ -5,6 +5,20 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
 public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
+    @Query("SELECT a FROM AuditLog a ORDER BY a.createdAt DESC")
+    List<AuditLog> findAllOrderByCreatedAtDesc();
+
+    @Query("""
+        SELECT a FROM AuditLog a
+        WHERE (:entityType IS NULL OR a.entityType = :entityType)
+          AND (:action IS NULL OR a.action = :action)
+        ORDER BY a.createdAt DESC
+    """)
+    List<AuditLog> findByEntityTypeAndAction(
+            @Param("entityType") String entityType,
+            @Param("action") String action
+    );
+
     @Query("""
         SELECT a FROM AuditLog a
         WHERE a.entityType = :entityType AND a.entityId = :entityId
